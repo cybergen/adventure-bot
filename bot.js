@@ -5,8 +5,8 @@ const util = require('util');
 
 const openai = new OpenAI();
 
-const initialJoinWindow = 20000;
-const stageResponseWindow = 6000;
+const initialJoinWindow = 30000;
+const stageResponseWindow = 60000;
 
 //possible states
 const IDLE_STATE = "idle";
@@ -79,11 +79,11 @@ async function handleNewAdventure(message) {
       currentState = ACTIVE_STATE;
       currentStage = 0;
       courseChannel = message.channel;
-      startCourse(params, players);
+      runCourse(params, players);
   });
 }
 
-async function startCourse(prompt, players) {
+async function runCourse(prompt, players) {
   courseDescription = eval('(' + await getLLMCourseDescription(prompt, players) + ')');
   courseChannel.send(`The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}`);
   console.log(`DEBUG: Full course info ${JSON.stringify(courseDescription)}`);
@@ -105,11 +105,12 @@ async function startStage() {
 
 //Only gets called if we're in state 'stage-input'
 async function handleAdventureProgress(player, message) {
-  currentStageContext += '\n' + JSON.stringify({
+  const input = JSON.stringify({
     player: player,
     reply: message
-  });
-  courseChannel.send(await appendToStageChatAndReturnLLMResponse(currentStageContext));
+  });  
+  const response = await appendToStageChatAndReturnLLMResponse({"role":"user","content":input});
+  courseChannel.send(response);
 }
 
 async function endStage() {
@@ -142,25 +143,35 @@ async function getLLMCourseDescription(prompt, players) {
   return await fetchOpenAIResponseSingleShot(courseDescriptionSystemPrompt, fullPrompt, courseDescriptionModel, courseDescriptionTokens);
 }
 
-// Get the initial description for the new stage
+//Starts a chat completion sequence
 async function getLLMStageDescription(courseDescription, courseHistory, playerHistory) {
-  // Simulated delay
-  return new Promise(resolve => setTimeout(() => resolve(`New stage ${currentStage}! What will you do?`), 1000));
+  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" 
+    + JSON.stringify(courseHistory) + "\n\nPlayer History:\n";
+  for (const history of playerHistory) {
+    fullPrompt += JSON.stringify(history) + "\n\n";
+  }
+  currentStageContext.push({"role":"system","content":stageSystemPrompt});
+  return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
 }
 
-async function appendToStageChatAndReturnLLMResponse(overallContext) {
-  //First append player action to the overall set of chat messages
+//Continues a chat completion sequence
+async function appendToStageChatAndReturnLLMResponse(userMessageObject) {
+  //First append latest action
+  currentStageContext.push(userMessageObject);  
 
   //Then get openAI response to overall chat
+  const response = await fetchOpenAIChatResponse(currentStageContext, stageChatModel, stageChatTokens);
 
   //Append openAI response to overall chat message set
+  currentStageContext.push({"role":"assistant","content":response});
 
-  //Return the 
-  return new Promise(resolve => setTimeout(() => resolve(`Current sum of stage context: ${overallContext}`), 1000));
+  //Return the response now
+  return response;
 }
 
 async function getAdventureResults(courseDescription, courseHistory, playerHistory) {
-  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" + JSON.stringify(courseHistory) + "\n\n";
+  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" 
+    + JSON.stringify(courseHistory) + "\n\nPlayer History:\n";
   for (const history of playerHistory) {
     fullPrompt += JSON.stringify(history) + "\n\n";
   }
@@ -172,6 +183,22 @@ async function fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens
     const completion = await openai.chat.completions.create({
       messages: [{"role": "system", "content": systemPrompt},
         {"role": "user", "content": prompt}],
+      model: model,
+      max_tokens: tokens
+    });
+    console.log(`Response: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
+    console.log(`Type of content: ${typeof(completion.choices[0].message.content)}`);
+    return completion.choices[0].message.content;
+  } catch (error) {
+    console.error("Error querying OpenAI:", error);
+    return null;
+  }
+}
+
+async function fetchOpenAIChatResponse(messageHistory, model, tokens) {
+  try {    
+    const completion = await openai.chat.completions.create({
+      messages: messageHistory,
       model: model,
       max_tokens: tokens
     });

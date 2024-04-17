@@ -7,14 +7,14 @@ You are an AI that produces a data structure describing a text-based obstacle co
   name: 'Race to Disgrace',
   theme: 'Psychedelic space obstacle course to win a new space-car',
   stages: 5,
-  players: [vimes, ghost_tree]
+  players: ['vimes', 'ghost_tree']
 }
 
 {
   name: 'Battle of the Brains',
   theme: 'Computer science knowledge gauntlet to prove technical supremacy',
   stages: 10,
-  players: [telomerase, Candelabra2]
+  players: ['telomerase', 'Candelabra2']
 }
 
 Assume that each stage takes around 1 minute or less, and set a stage count based on that.
@@ -37,7 +37,7 @@ Plan:
   name: 'Under the Mountains of Madness',
   theme: 'Grim fantasy dungeon delve to save a sick elf',
   stages: 10,
-  players: [vimes, ghost_tree]
+  players: ['vimes', 'ghost_tree']
 }
 
 Course History:
@@ -52,12 +52,12 @@ Course History:
 Player History: 
 
 {
-  player_id: vimes,
+  player_id: 'vimes',
   history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
 }
 
 {
-  player_id: ghost_tree,
+  player_id: 'ghost_tree',
   history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
 }
 
@@ -69,29 +69,27 @@ Plan:
 {
   theme: 'Hilarious, far-future urban sci-fi quest to get a job',
   stages: 5,
-  players: [vimes, ghost_tree]
+  players: ['vimes', 'ghost_tree']
 }
 
 Course History:
 [
 ]
 
-Player History: 
-
+Player History:
 {
-  player_id: vimes,
+  player_id: 'vimes',
   history: []
 }
-
 {
-  player_id: ghost_tree,
+  player_id: 'ghost_tree',
   history: []
 }
 
 ----Player Input
 
 {
-  player_id: vimes,
+  player_id: 'vimes',
   response: 'What does the robo-interviewer look like? Does it seem like they are attractive?'
 }
 
@@ -115,7 +113,7 @@ Course Description:
   name: 'Dark Times in Dungaree Delve',
   theme: 'Grim fantasy dungeon delve to save a sick elf',
   stages: 5,
-  players: [vimes, ghost_tree]
+  players: ['vimes', 'ghost_tree']
 }
 
 Course History:
@@ -129,11 +127,11 @@ Course History:
 
 Player History:
 {
-  player_id: vimes,
+  player_id: 'vimes',
   history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Used molerat corpse to get a soul crystal and save the sick elf']
 }
 
 {
-  player_id: ghost_tree,
+  player_id: 'ghost_tree',
   history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4', 'Emitted a ghostly wail several times on stage 5']
 }
