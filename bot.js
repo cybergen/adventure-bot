@@ -73,10 +73,6 @@ async function handleNewAdventure(message) {
   const initialMessage = await message.channel.send(`Adventure "${params}" is starting! React to this message to join the adventure.`);
   const collector = initialMessage.createReactionCollector({ time: initialJoinWindow });
 
-  collector.on('collect', (reaction, user) => {
-      console.log(`${user.tag} reacted with ${reaction.emoji.name}`);
-  });
-
   collector.on('end', collected => {
       const players = collected.map(reaction => reaction.users.cache.filter(u => !u.bot).map(user => user.username)).flat();      
       console.log(`Collected ${collected.size} items with players ${players}`);   
@@ -88,9 +84,12 @@ async function handleNewAdventure(message) {
 }
 
 async function runCourse(prompt, players) {
+  for (const player of players) {
+    playerHistory.push({"player_id":player,"history":[]});
+  }
+
   courseDescription = eval('(' + await getLLMCourseDescription(prompt, players) + ')');
   courseChannel.send(`The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}`);
-  console.log(`DEBUG: Full course info ${JSON.stringify(courseDescription)}`);
   while (currentStage < courseDescription.stages) {
     courseChannel.send(`Starting new stage!`);
     await startStage();
@@ -272,7 +271,7 @@ You are a fun and sarcastic conversational bot that invents and presents a text-
 
 Your initial input will look like so:
 
-Plan:
+Course Description:
 {
   name: 'Under the Mountains of Madness',
   theme: 'Grim fantasy dungeon delve to save a sick elf',
@@ -290,18 +289,26 @@ Course History:
 ]
 
 Player History: 
+[
+  {
+    player_id: 'vimes',
+    history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
+  },
+  {
+    player_id: 'ghost_tree',
+    history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
+  }
+]
 
-{
-  player_id: 'vimes',
-  history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
-}
+Note that the course and player histories may be empty at first if it is the first stage.
 
-{
-  player_id: 'ghost_tree',
-  history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
-}
+After getting the initial plan and history input, you will describe the new challenge stage. Then, the players will respond with their actions, which you can treat as final or prompt for follow-up.
 
-First, you will describe the current challenge stage. Then, the players will respond with their actions, which you can treat as final or prompt for follow-up. When you receive a system message to describe outcome, you will post a text description of what happens to the players. When you receive a subsequent system call to update history, you will update the Course History and Player History objects to include the new results. Please output those history objects (and ONLY those history objects) in the same schema as above.
+When you receive the system message DESCRIBE OUTCOME, you will post a text description of what happens to the players.
+
+When you receive a subsequent system call UPDATE HISTORY, you will update the Course History and Player History objects to reflect their actions and what happened to them during the stage.
+
+Please output those history objects (and ONLY those history objects) in the same schema as above.
 `;
 
 const resultSummarizerSystemPrompt = `
