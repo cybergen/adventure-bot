@@ -1,7 +1,11 @@
 const { Client, GatewayIntentBits, ReactionCollector, Message } = require('discord.js');
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions] });
+const { OpenAI } = require('openai');
+const util = require('util');
 
-const initialJoinWindow = 6000;
+const openai = new OpenAI();
+
+const initialJoinWindow = 20000;
 const stageResponseWindow = 6000;
 
 let currentState = "idle";
@@ -35,9 +39,9 @@ client.on('messageCreate', async message => {
 
     if (currentState === "idle" && message.content.startsWith('!adventure')) {
       handleNewAdventure(message);
-    } else if (currentState === "input-stage" && courseDescription.players.includes(message.author.username)) {
+    } else if (currentState === "input-stage" && courseDescription?.players?.includes(message.author.username)) {
       handleAdventureProgress(message.author.username, message.content);
-    } else if (currentState !== "idle" && courseDescription.players.includes(message.author.username)) {
+    } else if (currentState !== "idle" && courseDescription?.players?.includes(message.author.username)) {
       courseChannel.send("You can only take part in the adventure during challenge stages");
     }
 });
@@ -67,6 +71,7 @@ async function handleNewAdventure(message) {
 async function startCourse(prompt, players) {
   courseDescription = await getLLMCourseDescription(prompt, players);
   courseChannel.send(`The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}`);
+  courseChannel.send(`DEBUG: Full course info ${JSON.stringify(courseDescription)}`);
   while (currentStage < courseDescription.stages) {    
     await startStage();
     currentState = "post-stage";
@@ -119,15 +124,9 @@ LLM Functions
 
 // Simulated function to get LLM stage description
 async function getLLMCourseDescription(prompt, players) {
-  const testCourseDescription = {
-    name: 'Under the Mountains of Madness',
-    theme: 'Grim fantasy dungeon delve to save a sick elf',
-    stages: 5,
-    players: players
-  }
-
+  const fullPrompt = courseDescriptionPrompt + prompt + ". The players are " + players.join(', ');
   // Simulated delay
-  return new Promise(resolve => setTimeout(() => resolve(testCourseDescription), 1000));
+  return await fetchOpenAIResponse(fullPrompt, "gpt-3.5-turbo", 512);
 }
 
 // Get the initial description for the new stage
@@ -155,3 +154,48 @@ async function getLLMHistoryUpdate() {
 async function getAdventureResults(courseDescription, courseHistory, playerHistory) {
   return new Promise(resolve => setTimeout(() => resolve(`The end! Imagine a nice final summary with awards and accolades for all`), 500));
 }
+
+async function fetchOpenAIResponse(prompt, model, tokens) {
+  try {    
+    const completion = await openai.chat.completions.create({
+      messages: [{"role": "system", "content": courseDescriptionPrompt},
+        {"role": "user", "content": prompt}],
+      model: model,
+      max_tokens: tokens
+    });
+    console.log(`Response: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
+    console.log(`Type of content: ${typeof(completion.choices[0].message.content)}`);
+    //console.log(`Rest of info ${JSON.stringify(completion.choices)}`);
+    return eval('(' + completion.choices[0].message.content + ')');
+  } catch (error) {
+    console.error("Error querying OpenAI:", error);
+    return null;
+  }
+}
+
+/*
+
+Prompt strings
+
+*/
+
+const courseDescriptionPrompt = `
+System Prompt:
+You are an AI that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages, for a set of players. Your input will be a list of player id's, a duration, and a theme prompt. Your outputted data structure should look like so:
+
+{
+  name: 'Race to Disgrace',
+  theme: 'Psychedelic space obstacle course to win a new space-car',
+  stages: 5,
+  players: ['vimes', 'ghost_tree']
+}
+
+{
+  name: 'Battle of the Brains',
+  theme: 'Computer science knowledge gauntlet to prove technical supremacy',
+  stages: 10,
+  players: ['telomerase', 'Candelabra2']
+}
+
+Assume that each stage takes around 1 minute or less, and set a stage count based on that. Be sure to come up with a witty name!
+`;
