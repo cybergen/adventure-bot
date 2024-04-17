@@ -36,6 +36,10 @@ const stageChatTokens = 512;
 const resultSummarizerModel = "gpt-4-turbo-preview";
 const resultSummarizerTokens = 832;
 
+//Some commands for the chat bot
+const describeResultsMessage = "Describe Results";
+const updateHistoryMessage = "Update History";
+
 function resetCourse() {
     currentState = IDLE_STATE;
     currentStage = 0;
@@ -88,9 +92,11 @@ async function runCourse(prompt, players) {
   courseChannel.send(`The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}`);
   console.log(`DEBUG: Full course info ${JSON.stringify(courseDescription)}`);
   while (currentStage < courseDescription.stages) {
+    courseChannel.send(`Starting new stage!`);
     await startStage();
     currentState = INPUT_STAGE_STATE;
     await delay(stageResponseWindow);
+    courseChannel.send(`Time's up! Getting stage results!`);
     currentState = POST_STAGE_STATE;
     await endStage();
     currentStage++;
@@ -99,8 +105,10 @@ async function runCourse(prompt, players) {
 }
 
 async function startStage() {
-  currentStageContext = await getLLMStageDescription(courseDescription, courseHistory, playerHistory);
-  courseChannel.send(currentStageContext);
+  //First clear the overall stage chat sequence
+  currentStageContext = [];
+  //Then trigger the start of new stage chat completion
+  courseChannel.send(await getLLMStageDescription(courseDescription, courseHistory, playerHistory));
 }
 
 //Only gets called if we're in state 'stage-input'
@@ -114,11 +122,21 @@ async function handleAdventureProgress(player, message) {
 }
 
 async function endStage() {
-  courseChannel.send(await getLLMStageResults());
-  const history = await getLLMHistoryUpdate();
-  courseChannel.send(history);
-}
+  courseChannel.send(await appendToStageChatAndReturnLLMResponse({"role":"user","content":describeResultsMessage}));
+  const history = await appendToStageChatAndReturnLLMResponse({"role":"user","content":updateHistoryMessage});
 
+  //Parse history updates from history string
+  const sections = history.split(/\n(?=Course History:|Player History:)/);
+  courseHistory = parseSection(sections[0].split('Course History:')[1].trim());
+  const playerHistoryRaw = sections[1].split('Player History:')[1].trim();
+
+  // Since Player History contains multiple objects, split them and parse each one.
+  const playerHistoryObjects = playerHistoryRaw.split(/(?=^{)/);
+  playerHistory = playerHistoryObjects.map(obj => parseSection(obj.trim()));
+  console.log("Course Description:", courseDescription);
+  console.log("Course History:", courseHistory);
+  console.log("Player History:", playerHistory);
+}
 
 async function endAdventure(channel) {
   courseChannel.send(await getAdventureResults(courseDescription, courseHistory, playerHistory));
@@ -128,8 +146,19 @@ async function endAdventure(channel) {
 // Login to Discord with your app's token
 client.login(process.env.DISCORD_API_KEY);
 
+/*
+
+Helper Functions
+
+*/
+
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Helper function to parse safely using new Function
+function parseSection(data) {
+  return new Function(`return ${data};`)();
 }
 
 /*
