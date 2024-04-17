@@ -105,6 +105,7 @@ async function runCourse(prompt, players) {
 }
 
 async function startStage() {
+  console.log(`\n\n==========Sarting stage ${currentStage}`);
   //First clear the overall stage chat sequence
   currentStageContext = [];
   //Then trigger the start of new stage chat completion
@@ -207,7 +208,8 @@ async function getAdventureResults(courseDescription, courseHistory, playerHisto
   return await fetchOpenAIResponseSingleShot(resultSummarizerSystemPrompt, fullPrompt, resultSummarizerModel, resultSummarizerTokens)
 }
 
-async function fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens) {
+async function fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens) {  
+  console.log(`\n\n===================SINGLE SHOT NEW MESSAGE INPUT\n\n${prompt}\n`);
   try {    
     const completion = await openai.chat.completions.create({
       messages: [{"role": "system", "content": systemPrompt},
@@ -215,8 +217,7 @@ async function fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens
       model: model,
       max_tokens: tokens
     });
-    console.log(`Response: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
-    console.log(`Type of content: ${typeof(completion.choices[0].message.content)}`);
+    console.log(`\n\n=================SINGLE SHOT RESPONSE: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
     return completion.choices[0].message.content;
   } catch (error) {
     console.error("Error querying OpenAI:", error);
@@ -225,14 +226,14 @@ async function fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens
 }
 
 async function fetchOpenAIChatResponse(messageHistory, model, tokens) {
-  try {    
+  console.log(`\n\n===================CHAT NEW MESSAGE INPUT\n\n${JSON.stringify(messageHistory)}\n`);
+  try {
     const completion = await openai.chat.completions.create({
       messages: messageHistory,
       model: model,
       max_tokens: tokens
     });
-    console.log(`Response: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
-    console.log(`Type of content: ${typeof(completion.choices[0].message.content)}`);
+    console.log(`\n\n=================CHAT RESPONSE: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
     return completion.choices[0].message.content;
   } catch (error) {
     console.error("Error querying OpenAI:", error);
