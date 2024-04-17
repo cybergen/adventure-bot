@@ -6,7 +6,7 @@ const util = require('util');
 const openai = new OpenAI();
 
 const initialJoinWindow = 30000;
-const stageResponseWindow = 60000;
+const stageResponseWindow = 120000;
 
 //possible states
 const IDLE_STATE = "idle";
@@ -37,8 +37,8 @@ const resultSummarizerModel = "gpt-4-turbo-preview";
 const resultSummarizerTokens = 832;
 
 //Some commands for the chat bot
-const describeResultsMessage = "Describe Results";
-const updateHistoryMessage = "Update History";
+const describeResultsMessage = "DESCRIBE OUTCOME";
+const updateHistoryMessage = "UPDATE HISTORY";
 
 function resetCourse() {
     currentState = IDLE_STATE;
@@ -267,7 +267,7 @@ Assume that each stage takes around 1 minute or less, and set a stage count base
 `;
 
 const stageSystemPrompt = `
-You are a fun and sarcastic conversational bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on how they respond. The challenge is just one of many stages in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage, handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
+You are a fun, sarcastic, and pithy conversational bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on how they respond. The challenge is just one of many stages in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage, handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
 
 Your initial input will look like so:
 
@@ -302,15 +302,17 @@ Player History:
 
 Note that the course and player histories may be empty at first if it is the first stage.
 
-After getting the initial plan and history input, you will describe the new challenge stage. Then, the players will respond with their actions, which you can treat as final or prompt for follow-up.
+After getting the initial plan and history input, you will describe the new challenge stage. Then, the players will respond with their actions, to which you will reply in the your role as fun and sarcastic bot.
 
-When you receive the system message DESCRIBE OUTCOME, you will post a text description of what happens to the players.
+When you receive the user message 'DESCRIBE OUTCOME', you will post a text description of what happens to the players. Only the players will use this command or say this phrase.
 
-When you receive a subsequent system call UPDATE HISTORY, you will update the Course History and Player History objects to reflect their actions and what happened to them during the stage.
-
-Please output those history objects (and ONLY those history objects) in the same schema as above.
+When you receive the user message 'UPDATE HISTORY', you will update the Course History and Player History objects to reflect their actions and what happened to them during the stage. Only the players will use this command or say this phrase. Please output those history objects (and ONLY those history objects) in the same schema as above, when requested. Please be sure to properly escape characters in the Course History or Player History variables to ensure they can parse nicely by javascript.
 `;
 
 const resultSummarizerSystemPrompt = `
-You are a fun and sarcastic conversational bot that declares the results of an overall challenge course undertaken by a set of players based on a set of input data about the theme, the stages of the course, and some player event/action logs. Depending on the challenge, there may be winners and losers, or they may only involve survival/failure. If appropriate to the theme, it may also make sense to call out consolation prizes or other distinctions among the players.
+You are a fun and sarcastic conversational bot that declares the results of an overall challenge course undertaken by a set of players based on a set of input data about the theme, the stages of the course, and some player event/action logs. Depending on the challenge, there may be winners and losers, or they may only involve survival/failure.
+
+If appropriate to the theme, it may also make sense to call out consolation prizes or other distinctions among the players.
+
+Please keep the overall response pithy and short - less than 2000 characters. Only call out the important points.
 `;
