@@ -127,8 +127,7 @@ Course History:
   'Soul-eating machine that can dispense a crystal',
 ]
 
-Player History: 
-
+Player History:
 {
   player_id: vimes,
   history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Used molerat corpse to get a soul crystal and save the sick elf']
