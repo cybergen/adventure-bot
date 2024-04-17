@@ -26,7 +26,15 @@ let courseHistory = [];
 //History of what has befallen each player over time
 let playerHistory = [];
 //Chat-like full text of current stage for coherency (resets for each stage)
-let currentStageContext;
+let currentStageContext = [];
+
+//models and token sizes to use for different phases
+const courseDescriptionModel = "gpt-3.5-turbo";
+const courseDescriptionTokens = 512;
+const stageChatModel = "gpt-4";
+const stageChatTokens = 512;
+const resultSummarizerModel = "gpt-4-turbo-preview";
+const resultSummarizerTokens = 832;
 
 function resetCourse() {
     currentState = IDLE_STATE;
@@ -76,11 +84,13 @@ async function handleNewAdventure(message) {
 }
 
 async function startCourse(prompt, players) {
-  courseDescription = await getLLMCourseDescription(prompt, players);
+  courseDescription = eval('(' + await getLLMCourseDescription(prompt, players) + ')');
   courseChannel.send(`The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}`);
-  courseChannel.send(`DEBUG: Full course info ${JSON.stringify(courseDescription)}`);
-  while (currentStage < courseDescription.stages) {    
+  console.log(`DEBUG: Full course info ${JSON.stringify(courseDescription)}`);
+  while (currentStage < courseDescription.stages) {
     await startStage();
+    currentState = INPUT_STAGE_STATE;
+    await delay(stageResponseWindow);
     currentState = POST_STAGE_STATE;
     await endStage();
     currentStage++;
@@ -91,8 +101,6 @@ async function startCourse(prompt, players) {
 async function startStage() {
   currentStageContext = await getLLMStageDescription(courseDescription, courseHistory, playerHistory);
   courseChannel.send(currentStageContext);
-  currentState = INPUT_STAGE_STATE;
-  await delay(stageResponseWindow);
 }
 
 //Only gets called if we're in state 'stage-input'
@@ -101,7 +109,7 @@ async function handleAdventureProgress(player, message) {
     player: player,
     reply: message
   });
-  courseChannel.send(await processPlayerInputWithLLM(currentStageContext));
+  courseChannel.send(await appendToStageChatAndReturnLLMResponse(currentStageContext));
 }
 
 async function endStage() {
@@ -129,11 +137,9 @@ LLM Functions
 
 */
 
-// Simulated function to get LLM stage description
 async function getLLMCourseDescription(prompt, players) {
-  const fullPrompt = courseDescriptionSystemPrompt + prompt + ". The players are " + players.join(', ');
-  // Simulated delay
-  return await fetchOpenAIResponse(fullPrompt, "gpt-3.5-turbo", 512);
+  const fullPrompt = prompt + ". The players are " + players.join(', ');
+  return await fetchOpenAIResponseSingleShot(courseDescriptionSystemPrompt, fullPrompt, courseDescriptionModel, courseDescriptionTokens);
 }
 
 // Get the initial description for the new stage
@@ -142,38 +148,36 @@ async function getLLMStageDescription(courseDescription, courseHistory, playerHi
   return new Promise(resolve => setTimeout(() => resolve(`New stage ${currentStage}! What will you do?`), 1000));
 }
 
-// Simulated LLM processing function
-async function processPlayerInputWithLLM(overallContext) {
-  // Simulated processing delay and response
+async function appendToStageChatAndReturnLLMResponse(overallContext) {
+  //First append player action to the overall set of chat messages
+
+  //Then get openAI response to overall chat
+
+  //Append openAI response to overall chat message set
+
+  //Return the 
   return new Promise(resolve => setTimeout(() => resolve(`Current sum of stage context: ${overallContext}`), 1000));
 }
 
-// Simulated function to fetch stage results
-async function getLLMStageResults() {
-  return new Promise(resolve => setTimeout(() => resolve(`The players have surmounted the current stage`), 1000));
-}
-
-// Simulated function to update history
-async function getLLMHistoryUpdate() {
-  return new Promise(resolve => setTimeout(() => resolve(`Return updated course history and individual player histories here`), 1000));
-}
-
 async function getAdventureResults(courseDescription, courseHistory, playerHistory) {
-  return new Promise(resolve => setTimeout(() => resolve(`The end! Imagine a nice final summary with awards and accolades for all`), 500));
+  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" + JSON.stringify(courseHistory) + "\n\n";
+  for (const history of playerHistory) {
+    fullPrompt += JSON.stringify(history) + "\n\n";
+  }
+  return await fetchOpenAIResponseSingleShot(resultSummarizerSystemPrompt, fullPrompt, resultSummarizerModel, resultSummarizerTokens)
 }
 
-async function fetchOpenAIResponse(prompt, model, tokens) {
+async function fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens) {
   try {    
     const completion = await openai.chat.completions.create({
-      messages: [{"role": "system", "content": courseDescriptionSystemPrompt},
+      messages: [{"role": "system", "content": systemPrompt},
         {"role": "user", "content": prompt}],
       model: model,
       max_tokens: tokens
     });
     console.log(`Response: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
     console.log(`Type of content: ${typeof(completion.choices[0].message.content)}`);
-    //console.log(`Rest of info ${JSON.stringify(completion.choices)}`);
-    return eval('(' + completion.choices[0].message.content + ')');
+    return completion.choices[0].message.content;
   } catch (error) {
     console.error("Error querying OpenAI:", error);
     return null;
