@@ -31,7 +31,7 @@ let currentStageContext = [];
 //models and token sizes to use for different phases
 const courseDescriptionModel = "gpt-3.5-turbo";
 const courseDescriptionTokens = 512;
-const stageChatModel = "gpt-4";
+const stageChatModel = "gpt-4-turbo-preview";
 const stageChatTokens = 512;
 const resultSummarizerModel = "gpt-4-turbo-preview";
 const resultSummarizerTokens = 832;
