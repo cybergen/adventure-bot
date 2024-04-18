@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, ReactionCollector, Message } = require('discord.js');
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.GuildMembers] });
 const { OpenAI } = require('openai');
 const util = require('util');
 
@@ -10,12 +10,13 @@ const stageResponseWindow = 120000;
 
 //possible states
 const IDLE_STATE = "idle";
+const COLLECTING_STATE = "collecting";
 const ACTIVE_STATE = "active";
 const POST_STAGE_STATE = "post-stage";
 const INPUT_STAGE_STATE = "input-stage";
 
 //overall state tracking
-let currentState = "idle";
+let currentState = IDLE_STATE;
 let courseChannel = null;
 let currentStage = 0;
 
@@ -58,9 +59,9 @@ client.on('messageCreate', async message => {
 
     if (currentState === IDLE_STATE && message.content.startsWith('!adventure')) {
       handleNewAdventure(message);
-    } else if (currentState === INPUT_STAGE_STATE && courseDescription?.players?.includes(message.author.displayName)) {
-      handleAdventureProgress(message.author.displayName, message.content);
-    } else if (currentState !== IDLE_STATE && courseDescription?.players?.includes(message.author.displayName)) {
+    } else if (currentState === INPUT_STAGE_STATE && courseDescription?.players?.includes(message.member.displayName)) {
+      handleAdventureProgress(message.member.displayName, message.content, message);
+    } else if (currentState !== IDLE_STATE && courseDescription?.players?.includes(message.member.displayName)) {
       courseChannel.send("You can only take part in the adventure during challenge stages");
     }
 });
@@ -69,18 +70,46 @@ async function handleNewAdventure(message) {
   const params = message.content.slice('!adventure'.length).trim();
   if (!params) return message.reply("Please provide a prompt for the adventure including a theme and a duration.");
 
-  currentState = "collecting";
+  currentState = COLLECTING_STATE;
   const initialMessage = await message.channel.send(`Adventure "${params}" is starting! React to this message to join the adventure.`);
   const collector = initialMessage.createReactionCollector({ time: initialJoinWindow });
 
-  collector.on('end', collected => {
-      const players = collected.map(reaction => reaction.users.cache.filter(u => !u.bot).map(user => user.displayName)).flat();      
-      console.log(`Collected ${collected.size} items with players ${players}`);   
-      currentState = ACTIVE_STATE;
-      currentStage = 0;
-      courseChannel = message.channel;
-      runCourse(params, players);
+  const displayNames = await new Promise((resolve, reject) => {
+    let names = [];
+
+    collector.on('collect', (reaction, user) => {
+      console.log(`Collected ${reaction.emoji.name} from ${user.tag}`);
+    });
+
+    collector.on('end', collected => {
+      console.log(`Collected ${collected.size} reactions`);
+      // Map over the reactions to get user collections
+      Promise.all(collected.map(reaction => 
+        reaction.users.fetch().then(users => 
+          Promise.all(users.map(user => {
+            if (!user.bot) {
+              return message.guild.members.fetch(user.id)
+                .then(member => member.displayName);
+            }
+          }))
+        )
+      )).then(results => {
+        // Flatten the results and filter out undefined (from bot checks)
+        names = results.flat().filter(name => name !== undefined);
+        resolve(names);
+      }).catch(reject);
+    });
   });
+
+  currentState = ACTIVE_STATE;
+  currentStage = 0;
+  courseChannel = message.channel;
+
+  if (displayNames.length > 0) {
+    runCourse(params, displayNames);
+  } else {
+    courseChannel.send(`Nobody signed up! Cancelling this adventure, cowards.`);
+  }
 }
 
 async function runCourse(prompt, players) {
@@ -89,13 +118,13 @@ async function runCourse(prompt, players) {
   }
 
   courseDescription = eval('(' + await getLLMCourseDescription(prompt, players) + ')');
-  courseChannel.send(`The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}`);
+  courseChannel.send(`*The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}*`);
   while (currentStage < courseDescription.stages) {
-    courseChannel.send(`Starting new stage!`);
+    courseChannel.send(`__**Starting new stage!**__`);
     await startStage();
     currentState = INPUT_STAGE_STATE;
     await delay(stageResponseWindow);
-    courseChannel.send(`Time's up! Getting stage results!`);
+    courseChannel.send(`__**Time's up! Getting stage results!**__`);
     currentState = POST_STAGE_STATE;
     await endStage();
     currentStage++;
@@ -112,13 +141,13 @@ async function startStage() {
 }
 
 //Only gets called if we're in state 'stage-input'
-async function handleAdventureProgress(player, message) {
+async function handleAdventureProgress(player, message, replyable) {
   const input = JSON.stringify({
     player: player,
     reply: message
   });  
   const response = await appendToStageChatAndReturnLLMResponse({"role":"user","content":input});
-  message.reply({
+  replyable.reply({
     content: response,
     allowedMentions: { repliedUser: true }
   }).catch(console.error);
@@ -266,7 +295,7 @@ You are an AI that produces a data structure describing a text-based obstacle co
   players: ['telomerase', 'Candelabra2']
 }
 
-Assume that each stage takes around 1 minute or less, and set a stage count based on that. Be sure to come up with a witty name!
+Assume that each stage takes around 1 minute or less, and set a stage count based on that. Be sure to come up with a witty name! Escape all necessary characters for easy parsing.
 `;
 
 const stageSystemPrompt = `
