@@ -73,7 +73,7 @@ async function handleNewAdventure(message) {
   if (!params) return message.reply("Please provide a prompt for the adventure including a theme and a duration.");
 
   currentState = COLLECTING_STATE;
-  const initialMessage = await message.channel.send(`*We've got a new adventure starting! "${params}" is starting! React to this message to join the adventure.`);
+  const initialMessage = await message.channel.send(`*We've got a new adventure starting! React to this message to join the adventure.*`);
   const collector = initialMessage.createReactionCollector({ time: initialJoinWindow });
 
   const displayNames = await new Promise((resolve, reject) => {
@@ -158,7 +158,7 @@ async function handleAdventureProgress(player, message, replyable) {
 
 async function endStage() {
   courseChannel.send(await appendToStageChatAndReturnLLMResponse({"role":"user","content":describeResultsMessage}));
-  const history = await getStageHistory();
+  const history = await getStageHistory(courseHistory, playerHistory);
   console.log(`Received following history response: ${history}`);
 
   //Parse history updates from history string
@@ -211,11 +211,14 @@ async function getLLMCourseDescription(prompt, players) {
 //Starts a chat completion sequence
 async function getLLMStageDescription(courseDescription, courseHistory, playerHistory) {
   let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" 
-    + JSON.stringify(courseHistory) + "\n\nPlayer History:\n";
-  for (const history of playerHistory) {
-    fullPrompt += JSON.stringify(history) + "\n\n";
-  }
+    + JSON.stringify(courseHistory) + "\n\nPlayer History:\n" + JSON.stringify(playerHistory);
   currentStageContext.push({"role":"system","content":stageSystemPrompt});
+  return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
+}
+
+async function getStageHistory(courseHistory, playerHistory) {
+  let fullPrompt = "Now return an updated version of course history and player history in the following format:\n\n" 
+    + "Course History:\n" + JSON.stringify(courseHistory) + "\n\nPlayer History:\n" + JSON.stringify(playerHistory);
   return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
 }
 
@@ -231,11 +234,6 @@ async function appendToStageChatAndReturnLLMResponse(userMessageObject) {
   currentStageContext.push({"role":"assistant","content":response});
 
   //Return the response now
-  return response;
-}
-
-async function getStageHistory() {
-  const response = await fetchOpenAIChatResponse(currentStageContext, stageHistoryModel, stageHistoryTokens);
   return response;
 }
 
