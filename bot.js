@@ -7,6 +7,7 @@ const openai = new OpenAI();
 
 const initialJoinWindow = 30000;
 const stageResponseWindow = 120000;
+const postStageWindow = 15000;
 
 //possible states
 const IDLE_STATE = "idle";
@@ -36,10 +37,11 @@ const stageChatModel = "gpt-4-turbo-preview";
 const stageChatTokens = 512;
 const resultSummarizerModel = "gpt-4-turbo-preview";
 const resultSummarizerTokens = 832;
+const stageHistoryModel = "gpt-3.5-turbo";
+const stageHistoryTokens = 512;
 
 //Some commands for the chat bot
-const describeResultsMessage = "DESCRIBE OUTCOME";
-const updateHistoryMessage = "UPDATE HISTORY";
+const describeResultsMessage = "Time's up!";
 
 function resetCourse() {
     currentState = IDLE_STATE;
@@ -71,7 +73,7 @@ async function handleNewAdventure(message) {
   if (!params) return message.reply("Please provide a prompt for the adventure including a theme and a duration.");
 
   currentState = COLLECTING_STATE;
-  const initialMessage = await message.channel.send(`Adventure "${params}" is starting! React to this message to join the adventure.`);
+  const initialMessage = await message.channel.send(`*We've got a new adventure starting! "${params}" is starting! React to this message to join the adventure.`);
   const collector = initialMessage.createReactionCollector({ time: initialJoinWindow });
 
   const displayNames = await new Promise((resolve, reject) => {
@@ -127,6 +129,7 @@ async function runCourse(prompt, players) {
     courseChannel.send(`__**Time's up! Getting stage results!**__`);
     currentState = POST_STAGE_STATE;
     await endStage();
+    await delay(postStageWindow);
     currentStage++;
   }
   await endAdventure();
@@ -155,7 +158,8 @@ async function handleAdventureProgress(player, message, replyable) {
 
 async function endStage() {
   courseChannel.send(await appendToStageChatAndReturnLLMResponse({"role":"user","content":describeResultsMessage}));
-  const history = await appendToStageChatAndReturnLLMResponse({"role":"user","content":updateHistoryMessage});
+  const history = await getStageHistory();
+  console.log(`Received following history response: ${history}`);
 
   //Parse history updates from history string
   const sections = history.split(/\n(?=Course History:|Player History:)/);
@@ -230,6 +234,11 @@ async function appendToStageChatAndReturnLLMResponse(userMessageObject) {
   return response;
 }
 
+async function getStageHistory() {
+  const response = await fetchOpenAIChatResponse(currentStageContext, stageHistoryModel, stageHistoryTokens);
+  return response;
+}
+
 async function getAdventureResults(courseDescription, courseHistory, playerHistory) {
   let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" 
     + JSON.stringify(courseHistory) + "\n\nPlayer History:\n";
@@ -279,7 +288,7 @@ Prompt strings
 */
 
 const courseDescriptionSystemPrompt = `
-You are an AI that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages, for a set of players. Your input will be a list of player id's, a duration, and a theme prompt. Your outputted data structure should look like so:
+You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages, for a set of players. Your input will be a list of player id's, a duration, and a theme prompt. Your outputted data structure should look like so:
 
 {
   name: 'Race to Disgrace',
@@ -290,7 +299,7 @@ You are an AI that produces a data structure describing a text-based obstacle co
 
 {
   name: 'Battle of the Brains',
-  theme: 'Computer science knowledge gauntlet to prove technical supremacy',
+  theme: 'Computer science knowledge gauntlet',
   stages: 10,
   players: ['telomerase', 'Candelabra2']
 }
@@ -299,7 +308,7 @@ Assume that each stage takes around 1 minute or less, and set a stage count base
 `;
 
 const stageSystemPrompt = `
-You are a fun, sarcastic, and pithy conversational bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on how they respond. The challenge is just one of many stages in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage, handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
+You are a pithy, sarcastic, and concise discord bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on how they respond. The challenge is just one of many stages in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage, handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
 
 Your initial input will look like so:
 
@@ -334,17 +343,48 @@ Player History:
 
 Note that the course and player histories may be empty at first if it is the first stage.
 
-After getting the initial plan and history input, you will describe the new challenge stage. Then, the players will respond with their actions, to which you will reply in the your role as fun and sarcastic bot.
+After getting the initial plan and history input, you will describe the new challenge stage. Then, the players will respond with their actions, to which you will reply in the your role as a fun and sarcastic discord bot. You will not say the final outcome, however, until you are notified that time is up for that stage. Then you will tell the players the results of their actions.
+`;
 
-When you receive the user message 'DESCRIBE OUTCOME', you will post a text description of what happens to the players. Only the players will use this command or say this phrase.
+const historyUpdatePrompt = `
+You are a highly capable AI that will receive a block of data with history for a challenge course and several players and a log of activity for the previous stage, then produce an updated version of the course and player history data. Your input will look like so:
 
-When you receive the user message 'UPDATE HISTORY', you will update the Course History and Player History objects to reflect their actions and what happened to them during the stage. Only the players will use this command or say this phrase. Please output those history objects (and ONLY those history objects) in the same schema as above, when requested. Please be sure to properly escape characters in the Course History or Player History variables to ensure they can parse nicely by javascript.
+Course Description:
+{
+  name: 'Under the Mountains of Madness',
+  theme: 'Grim fantasy dungeon delve to save a sick elf',
+  stages: 10,
+  players: ['vimes', 'ghost_tree']
+}
+
+Course History:
+[
+  'Dungeon entrance encountered in a forest glade',
+  'Attacked by a series of spiders',
+  'Swinging blade trap across a narrow walkway',
+  'Skeletons and a molerat necromancer attack',
+  'Soul-eating machine that can dispense a crystal',
+]
+
+Player History: 
+[
+  {
+    player_id: 'vimes',
+    history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
+  },
+  {
+    player_id: 'ghost_tree',
+    history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
+  }
+]
+
+Your reply will only include the Course History and Player History segments, formatted in the same schema as above, with up to one addition for each of the players and the overall course, based on the outcome of their last stage. You are extra good at properly escaping characters in the variables to ensure they can be easily parsed.
 `;
 
 const resultSummarizerSystemPrompt = `
-You are a fun and sarcastic conversational bot that declares the results of an overall challenge course undertaken by a set of players based on a set of input data about the theme, the stages of the course, and some player event/action logs. Depending on the challenge, there may be winners and losers, or they may only involve survival/failure.
+You are a fun and sarcastic discord chat bot that declares the results of an overall challenge course undertaken by a set of players based on a set of input data about the theme, the stages of the course, and some player event/action logs. Depending on the challenge, there may be winners and losers, or they may only involve survival/failure.
 
 If appropriate to the theme, it may also make sense to call out consolation prizes or other distinctions among the players.
 
-Please keep the overall response pithy and short - less than 2000 characters. Only call out the important points.
+You are extra great at keeping your replies concise, only calling out the important points.
 `;
