@@ -58,9 +58,9 @@ client.on('messageCreate', async message => {
 
     if (currentState === IDLE_STATE && message.content.startsWith('!adventure')) {
       handleNewAdventure(message);
-    } else if (currentState === INPUT_STAGE_STATE && courseDescription?.players?.includes(message.author.username)) {
-      handleAdventureProgress(message.author.username, message.content);
-    } else if (currentState !== IDLE_STATE && courseDescription?.players?.includes(message.author.username)) {
+    } else if (currentState === INPUT_STAGE_STATE && courseDescription?.players?.includes(message.author.displayName)) {
+      handleAdventureProgress(message.author.displayName, message.content);
+    } else if (currentState !== IDLE_STATE && courseDescription?.players?.includes(message.author.displayName)) {
       courseChannel.send("You can only take part in the adventure during challenge stages");
     }
 });
@@ -74,7 +74,7 @@ async function handleNewAdventure(message) {
   const collector = initialMessage.createReactionCollector({ time: initialJoinWindow });
 
   collector.on('end', collected => {
-      const players = collected.map(reaction => reaction.users.cache.filter(u => !u.bot).map(user => user.username)).flat();      
+      const players = collected.map(reaction => reaction.users.cache.filter(u => !u.bot).map(user => user.displayName)).flat();      
       console.log(`Collected ${collected.size} items with players ${players}`);   
       currentState = ACTIVE_STATE;
       currentStage = 0;
@@ -118,7 +118,10 @@ async function handleAdventureProgress(player, message) {
     reply: message
   });  
   const response = await appendToStageChatAndReturnLLMResponse({"role":"user","content":input});
-  courseChannel.send(response);
+  message.reply({
+    content: response,
+    allowedMentions: { repliedUser: true }
+  }).catch(console.error);
 }
 
 async function endStage() {
