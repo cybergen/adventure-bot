@@ -120,6 +120,7 @@ async function runCourse(prompt, players) {
   }
 
   courseDescription = eval('(' + await getLLMCourseDescription(prompt, players) + ')');
+  courseDescription.players = players;
   courseChannel.send(`*The adventure "${courseDescription.name}" begins with the following brave souls: ${courseDescription.players.join(', ')}*`);
   while (currentStage < courseDescription.stages) {
     courseChannel.send(`__**Starting new stage!**__`);
