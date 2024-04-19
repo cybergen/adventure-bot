@@ -21,17 +21,43 @@ export class OpenAIService {
   }
 
   //Starts a chat completion sequence
-  public async getLLMStageDescription(courseDescription, courseHistory, playerHistory) {
+  public async getLLMStageDescription(courseContext: object[], courseDescription, courseHistory, playerHistory): Promise<string> {
+    const rtnContext = [];
+    rtnContext.push({"role":"system","content":stageSystemPrompt});
+    
     let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n"
       + JSON.stringify(courseHistory) + "\n\nPlayer History:\n" + JSON.stringify(playerHistory);
-    currentStageContext.push({"role":"system","content":stageSystemPrompt});
-    return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
+    return await this.appendToStageChatAndReturnLLMResponse(courseHistory, {"role":"user","content":fullPrompt});
   }
 
   public async getStageHistory(courseHistory, playerHistory) {
     let fullPrompt = "Now return an updated version of course history and player history in the following format:\n\n"
       + "Course History:\n" + JSON.stringify(courseHistory) + "\n\nPlayer History:\n" + JSON.stringify(playerHistory);
-    return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
+    return await this.appendToStageChatAndReturnLLMResponse(courseHistory, {"role":"user","content":fullPrompt});
+  }
+
+  public async getAdventureResults(courseDescription, courseHistory, playerHistory) {
+    let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n"
+      + JSON.stringify(courseHistory) + "\n\nPlayer History:\n";
+    for (const history of playerHistory) {
+      fullPrompt += JSON.stringify(history) + "\n\n";
+    }
+    return await this.fetchOpenAIResponseSingleShot(resultSummarizerSystemPrompt, fullPrompt, resultSummarizerModel, resultSummarizerTokens)
+  }
+
+  //Continues a chat completion sequence
+  public async appendToStageChatAndReturnLLMResponse(stageContext: object[], userMessageObject: object): Promise<string> {
+    //First append latest action
+    stageContext.push(userMessageObject)
+
+    //Then get openAI response to overall chat
+    const response = await this.fetchOpenAIChatResponse(stageContext, stageChatModel, stageChatTokens);
+
+    //Append openAI response to overall chat message set
+    stageContext.push({"role":"assistant","content":response});
+
+    //Return the response now
+    return response;
   }
 
   private async fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens) {

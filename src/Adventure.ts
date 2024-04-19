@@ -78,17 +78,17 @@ export class Adventure extends Emitter<AdventureEvents> {
     
     while (this._currentStage < this._courseDescription.stages) {
       await this._startMsg.continue(`__**Starting new stage!**__`);
-      await startStage();
+      await this.startStage();
       this._state = AdventureState.InputStage;
       await Delay.ms(STAGE_RESPONSE_DURATION);
       
       await this._startMsg.continue(`__**Time's up! Getting stage results!**__`);
       this._state = AdventureState.PostStage;
-      await endStage();
+      await this.endStage();
       await Delay.ms(POST_STAGE_DURATION);
       this._currentStage++;
     }
-    await endAdventure();
+    await this.endAdventure();
   }
 
   private async startStage() {
@@ -97,31 +97,38 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._currentStageContext = [];
     //Then trigger the start of new stage chat completion
     
-    this._lastMsg = this._lastMsg
-    
-    courseChannel.send(await getLLMStageDescription(courseDescription, courseHistory, playerHistory));
+    const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._courseHistory, this._playerHistory);
+    await this._startMsg.continue(result);
   }
 
   private async endStage() {
-    courseChannel.send(await appendToStageChatAndReturnLLMResponse({"role":"user","content":describeResultsMessage}));
-    const history = await getStageHistory(courseHistory, playerHistory);
+    const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
+    this._startMsg.continue(result);
+    
+    const history = await Services.OpenAI.getStageHistory(this._courseHistory, this._playerHistory);
     console.log(`Received following history response: ${history}`);
 
     //Parse history updates from history string
     const sections = history.split(/\n(?=Course History:|Player History:)/);
-    courseHistory = parseSection(sections[0].split('Course History:')[1].trim());
+    this._courseHistory = this.parseSection(sections[0].split('Course History:')[1].trim());
     const playerHistoryRaw = sections[1].split('Player History:')[1].trim();
 
     // Since Player History contains multiple objects, split them and parse each one.
     const playerHistoryObjects = playerHistoryRaw.split(/(?=^{)/);
-    playerHistory = playerHistoryObjects.map(obj => parseSection(obj.trim()));
-    console.log("Course Description:", courseDescription);
-    console.log("Course History:", courseHistory);
-    console.log("Player History:", playerHistory);
+    this._playerHistory = playerHistoryObjects.map(obj => this.parseSection(obj.trim()));
+    console.log("Course Description:", this._courseDescription);
+    console.log("Course History:", this._courseHistory);
+    console.log("Player History:", this._playerHistory);
   }
 
-  private async endAdventure(channel) {
-    this._startMsg.continue(await getAdventureResults(courseDescription, courseHistory, playerHistory));
-    resetCourse();
+  private async endAdventure() {
+    this._startMsg.continue(await Services.OpenAI.getAdventureResults(this._courseDescription, this._courseHistory, this._playerHistory));
+    
+    this.emit('concluded');
+  }
+
+  // Helper function to parse safely using new Function
+  private parseSection(data) {
+    return new Function(`return ${data};`)();
   }
 }
