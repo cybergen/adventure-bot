@@ -1,10 +1,15 @@
-import { DiscordAPI } from './DiscordAPI';
+import { DungeonMaster } from './DungeonMaster';
+import { Services } from './services/Services';
 
 (async() => {
   console.log('AdventureBot starting...');
+
+  const dm = new DungeonMaster();
   
-  const discord = new DiscordAPI();
-  discord.on('messageRx', args => {
-    console.log(args);
+  Services.Discord.on('messageRx', ctx => {
+    console.log('hmm');
+    dm.ProcessMessage(ctx);
   });
+  await Services.Discord.initialize();
+  
 })();

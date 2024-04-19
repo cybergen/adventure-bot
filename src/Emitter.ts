@@ -38,6 +38,8 @@ export abstract class Emitter<T extends object> {
   }
 
   protected emit<K extends keyof T>(evt: K, arg: T[K] = null): void {
+    console.log(evt);
+    console.log(this._map);
     const lookup = this._map[evt];
     if (!lookup) return;
 
