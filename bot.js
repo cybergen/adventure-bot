@@ -24,9 +24,7 @@ let currentStage = 0;
 //Initial plan for course
 let courseDescription = {};
 //Overall history of stages in the course
-let courseHistory = [];
-//History of what has befallen each player over time
-let playerHistory = [];
+let history = "";
 //Chat-like full text of current stage for coherency (resets for each stage)
 let currentStageContext = [];
 
@@ -37,8 +35,6 @@ const stageChatModel = "gpt-4-turbo-preview";
 const stageChatTokens = 512;
 const resultSummarizerModel = "gpt-4-turbo-preview";
 const resultSummarizerTokens = 832;
-const stageHistoryModel = "gpt-3.5-turbo";
-const stageHistoryTokens = 512;
 
 //Some commands for the chat bot
 const describeResultsMessage = "Time's up!";
@@ -115,9 +111,11 @@ async function handleNewAdventure(message) {
 }
 
 async function runCourse(prompt, players) {
+  let playerHistory = [];
   for (const player of players) {
     playerHistory.push({"player_id":player,"history":[]});
   }
+  history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
   courseDescription = eval('(' + await getLLMCourseDescription(prompt, players) + ')');
   courseDescription.players = players;
@@ -141,7 +139,7 @@ async function startStage() {
   //First clear the overall stage chat sequence
   currentStageContext = [];
   //Then trigger the start of new stage chat completion
-  courseChannel.send(await getLLMStageDescription(courseDescription, courseHistory, playerHistory));
+  courseChannel.send(await getLLMStageDescription(courseDescription, history));
 }
 
 //Only gets called if we're in state 'stage-input'
@@ -159,24 +157,12 @@ async function handleAdventureProgress(player, message, replyable) {
 
 async function endStage() {
   courseChannel.send(await appendToStageChatAndReturnLLMResponse({"role":"user","content":describeResultsMessage}));
-  const history = await getStageHistory(courseHistory, playerHistory);
+  history = await getStageHistory(history);
   console.log(`Received following history response: ${history}`);
-
-  //Parse history updates from history string
-  const sections = history.split(/\n(?=Course History:|Player History:)/);
-  courseHistory = parseSection(sections[0].split('Course History:')[1].trim());
-  const playerHistoryRaw = sections[1].split('Player History:')[1].trim();
-
-  // Since Player History contains multiple objects, split them and parse each one.
-  const playerHistoryObjects = playerHistoryRaw.split(/(?=^{)/);
-  playerHistory = playerHistoryObjects.map(obj => parseSection(obj.trim()));
-  console.log("Course Description:", courseDescription);
-  console.log("Course History:", courseHistory);
-  console.log("Player History:", playerHistory);
 }
 
 async function endAdventure(channel) {
-  courseChannel.send(await getAdventureResults(courseDescription, courseHistory, playerHistory));
+  courseChannel.send(await getAdventureResults(courseDescription, history));
   resetCourse();
 }
 
@@ -193,11 +179,6 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// Helper function to parse safely using new Function
-function parseSection(data) {
-  return new Function(`return ${data};`)();
-}
-
 /*
 
 LLM Functions
@@ -210,16 +191,14 @@ async function getLLMCourseDescription(prompt, players) {
 }
 
 //Starts a chat completion sequence
-async function getLLMStageDescription(courseDescription, courseHistory, playerHistory) {
-  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" 
-    + JSON.stringify(courseHistory) + "\n\nPlayer History:\n" + JSON.stringify(playerHistory);
+async function getLLMStageDescription(courseDescription, history) {
+  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\n" + history;
   currentStageContext.push({"role":"system","content":stageSystemPrompt});
   return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
 }
 
-async function getStageHistory(courseHistory, playerHistory) {
-  let fullPrompt = "Now return an updated version of course history and player history in the following format:\n\n" 
-    + "Course History:\n" + JSON.stringify(courseHistory) + "\n\nPlayer History:\n" + JSON.stringify(playerHistory);
+async function getStageHistory(history) {
+  let fullPrompt = "Now return an updated version of course history and player history in the following format:\n\n" + history;
   return await appendToStageChatAndReturnLLMResponse({"role":"user","content":fullPrompt});
 }
 
@@ -238,12 +217,8 @@ async function appendToStageChatAndReturnLLMResponse(userMessageObject) {
   return response;
 }
 
-async function getAdventureResults(courseDescription, courseHistory, playerHistory) {
-  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\nCourse History:\n" 
-    + JSON.stringify(courseHistory) + "\n\nPlayer History:\n";
-  for (const history of playerHistory) {
-    fullPrompt += JSON.stringify(history) + "\n\n";
-  }
+async function getAdventureResults(courseDescription, history) {
+  let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\n" + history;
   return await fetchOpenAIResponseSingleShot(resultSummarizerSystemPrompt, fullPrompt, resultSummarizerModel, resultSummarizerTokens)
 }
 
@@ -287,23 +262,23 @@ Prompt strings
 */
 
 const courseDescriptionSystemPrompt = `
-You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages, for a set of players. Your input will be a list of player id's, a duration, and a theme prompt. Your outputted data structure should look like so:
+You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, and a theme prompt. Your outputted data structure should look like so:
 
 {
-  name: 'Race to Disgrace',
-  theme: 'Psychedelic space obstacle course to win a new space-car',
+  name: 'The Wizard\'s Challenge',
+  theme: 'Magical quest through enchanted realms to unlock a wizard\'s ultimate power',
   stages: 5,
   players: ['vimes', 'ghost_tree']
 }
 
 {
   name: 'Battle of the Brains',
-  theme: 'Computer science knowledge gauntlet',
+  theme: 'A light-hearded computer science romp',
   stages: 10,
   players: ['telomerase', 'Candelabra2']
 }
 
-Assume that each stage takes around 1 minute or less, and set a stage count based on that. Be sure to come up with a witty name! Escape all necessary characters for easy parsing.
+Assume that each stage takes around 2 minutes, and set a stage count based on that. Be sure to come up with a witty name!
 `;
 
 const stageSystemPrompt = `
@@ -343,41 +318,6 @@ Player History:
 Note that the course and player histories may be empty at first if it is the first stage.
 
 After getting the initial plan and history input, you will describe the new challenge stage. Then, the players will respond with their actions, to which you will reply in the your role as a fun and sarcastic discord bot. You will not say the final outcome, however, until you are notified that time is up for that stage. Then you will tell the players the results of their actions.
-`;
-
-const historyUpdatePrompt = `
-You are a highly capable AI that will receive a block of data with history for a challenge course and several players and a log of activity for the previous stage, then produce an updated version of the course and player history data. Your input will look like so:
-
-Course Description:
-{
-  name: 'Under the Mountains of Madness',
-  theme: 'Grim fantasy dungeon delve to save a sick elf',
-  stages: 10,
-  players: ['vimes', 'ghost_tree']
-}
-
-Course History:
-[
-  'Dungeon entrance encountered in a forest glade',
-  'Attacked by a series of spiders',
-  'Swinging blade trap across a narrow walkway',
-  'Skeletons and a molerat necromancer attack',
-  'Soul-eating machine that can dispense a crystal',
-]
-
-Player History: 
-[
-  {
-    player_id: 'vimes',
-    history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
-  },
-  {
-    player_id: 'ghost_tree',
-    history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
-  }
-]
-
-Your reply will only include the Course History and Player History segments, formatted in the same schema as above, with up to one addition for each of the players and the overall course, based on the outcome of their last stage. You are extra good at properly escaping characters in the variables to ensure they can be easily parsed.
 `;
 
 const resultSummarizerSystemPrompt = `
