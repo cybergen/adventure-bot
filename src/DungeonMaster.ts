@@ -15,12 +15,18 @@ export class DungeonMaster {
       console.log('woo');
       
       // Spinup new adventure
-      // const adventure = new Adventure();
-      // this._adventures[msg.channelId] = adventure;
+      const adventure = new Adventure();
+      adventure.on('concluded', () => {
+        this._adventures.splice(this._adventures.indexOf(adventure), 1);
+      });
       
-      // adventure.initialize(msg);
+      this._adventures[msg.channelId] = adventure;
+      
+      adventure.initialize(msg);
+      
     } else {
       // Continue existing adventure
+      adventure.addPlayerInput(msg);
     }
   }
 }

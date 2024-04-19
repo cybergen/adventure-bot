@@ -12,12 +12,22 @@ export class MsgContext {
     return this._message.content;
   }
   
+  public get author(): { id: string, name: string } {
+    return {
+      id: this._message.author.id,
+      name: this._message.author.displayName
+    };
+  }
+  
   public constructor(message: Message) {
     this._message = message;
   }
   
   public async reply(msg: string) {
-    await this._message.reply(msg);
+    await this._message.reply({
+      content: msg,
+      allowedMentions: { repliedUser: true }
+    });
   }
   
   public async continue(msg: string): Promise<MsgContext> {

@@ -73,6 +73,16 @@ export class Adventure extends Emitter<AdventureEvents> {
     setTimeout(this.runAdventure.bind(this), 1000);
   }
   
+  public async addPlayerInput(msg: MsgContext) {
+    // TODO: Map playerId -> name
+    const input = JSON.stringify({
+      player: msg.author.name,
+      reply: msg.content
+    });
+    const response = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":input});
+    msg.reply(response);
+  }
+  
   private async runAdventure() {
     await this._startMsg.continue(`*The adventure "${this._courseDescription.name}" begins with the following brave souls: ${this._courseDescription.players.join(', ')}*`);
     
