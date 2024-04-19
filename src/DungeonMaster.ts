@@ -10,9 +10,7 @@ export class DungeonMaster {
   public async ProcessMessage(msg: MsgContext) {
     const adventure = this._adventures[msg.channelId];
     if (!adventure) {
-      console.log('maybe')
       if (!msg.content.toLowerCase().startsWith(CHAT_INVOKE_CMD)) return;
-      console.log('woo');
       
       // Spinup new adventure
       const adventure = new Adventure();
