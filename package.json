@@ -12,5 +12,8 @@
   "dependencies": {
     "discord.js": "^14.14.1",
     "openai": "^4.36.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2"
   }
 }
