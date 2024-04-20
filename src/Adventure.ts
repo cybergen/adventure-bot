@@ -85,8 +85,8 @@ export class Adventure extends Emitter<AdventureEvents> {
       player: msg.author.name,
       reply: msg.content
     });
-    const response = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":input});
-    msg.reply(response);
+    this._currentStageContext.push({"role":"user","content":input});
+    msg.reply(`*Action received! You'll get your results at the end of the stage.*`);
   }
   
   private async runAdventure() {
