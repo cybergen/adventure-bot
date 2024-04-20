@@ -42,7 +42,6 @@ export class DiscordService extends Emitter<DiscordEvents> {
       if (replyOf.author.id !== this._client.user?.id) return;
     }
 
-    console.log('should emit')
     this.emit('messageRx', new MsgContext(msg));
   }
 

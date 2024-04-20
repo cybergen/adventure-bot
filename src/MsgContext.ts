@@ -15,7 +15,7 @@ export class MsgContext {
   public get author(): { id: string, name: string } {
     return {
       id: this._message.author.id,
-      name: this._message.author.displayName
+      name: this._message.member.displayName
     };
   }
   
