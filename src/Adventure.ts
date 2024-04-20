@@ -6,7 +6,7 @@ import { Services } from './services/Services';
 import { Delay } from './Delay';
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up!";
+const describeResultsMessage = "Time's up! The players should have supplied their actions. Please describe what happens to them in 2 sentences each.";
 
 enum AdventureState {
   Idle = 'idle',
