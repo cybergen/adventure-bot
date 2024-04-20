@@ -110,7 +110,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         
         // Eventually: Handle users adding multiple prior to replying to privacy.
         this._stagePlayerInput[ctx.userId] = modalResult.input;
-        this._stageRepliedPlayers.push(ctx.userId);
+        this._stageRepliedPlayers.push(this._players[ctx.userId]);
 
         // Whisper back, ask about privacy
         modalResult.reply({
