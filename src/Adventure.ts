@@ -8,7 +8,7 @@ import { InteractionIntent } from './discord-utils/InteractionId';
 import * as JSON5 from 'json5'
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each.";
+const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
 
 enum AdventureState {
   Idle = 'idle',
@@ -110,7 +110,6 @@ export class Adventure extends Emitter<AdventureEvents> {
         
         // Eventually: Handle users adding multiple prior to replying to privacy.
         this._stagePlayerInput[ctx.userId] = modalResult.input;
-        this._stageRepliedPlayers.push(this._players[ctx.userId]);
 
         // Whisper back, ask about privacy
         modalResult.reply({
@@ -123,19 +122,36 @@ export class Adventure extends Emitter<AdventureEvents> {
         });
         break;
       case InteractionIntent.Agree:
-        ctx.continue({
-          segments: [{
-            header: this._players[ctx.userId],
-            body: this._stagePlayerInput[ctx.userId]
-          }]
-        });
-        this.postIfMissingInput(ctx, this._courseDescription.players, this._stageRepliedPlayers);
+        this._stageRepliedPlayers.push(this._players[ctx.userId]);
+        if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+          const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
+          ctx.continue({
+            segments: [{
+              header: this._players[ctx.userId],
+              body: this._stagePlayerInput[ctx.userId] + `\n\nStill awaiting actions for: ${missingPlayers}`
+            }]
+          });
+        } else {
+          ctx.continue({
+            segments: [{
+              header: this._players[ctx.userId],
+              body: this._stagePlayerInput[ctx.userId]
+            }]
+          });
+        }
         break;
       case InteractionIntent.Disagree:
-        ctx.continue({
-          plainTxt: `${this._players[ctx.userId]} has acted in secret.`
-        });
-        this.postIfMissingInput(ctx, this._courseDescription.players, this._stageRepliedPlayers);
+        this._stageRepliedPlayers.push(this._players[ctx.userId]);
+        if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+          const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
+          ctx.continue({
+            plainTxt: `${this._players[ctx.userId]} has acted in secret.\n\nStill awaiting actions for: ${missingPlayers}`
+          });
+        } else {
+          ctx.continue({
+            plainTxt: `${this._players[ctx.userId]} has acted in secret.`
+          });
+        }
         break;
     }
   }
@@ -210,17 +226,6 @@ export class Adventure extends Emitter<AdventureEvents> {
     });
     
     this.emit('concluded');
-  }
-
-  private postIfMissingInput(ctx: ButtonContext, fullPlayerSet: string[], currentRepliedSet: string[]): void {
-    if (fullPlayerSet.every(element => currentRepliedSet.includes(element))) {
-      return;
-    }
-
-    const missingPlayers = fullPlayerSet.filter(element => !currentRepliedSet.includes(element)).join(", ");
-    ctx.continue({
-      plainTxt: `Still awaiting actions for: ${missingPlayers}`
-    });
   }
 
   private startStageTimer(): void {
