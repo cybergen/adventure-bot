@@ -1,6 +1,7 @@
 ﻿import { Adventure } from './Adventure';
 import { CHAT_INVOKE_CMD } from './Constants';
 import { MsgContext } from './MsgContext';
+import { ButtonContext } from './ButtonContext';
 
 export class DungeonMaster {
   
@@ -8,7 +9,7 @@ export class DungeonMaster {
   private _adventures: Adventure[] = [];
   
   public async ProcessMessage(msg: MsgContext) {
-    const adventure = this._adventures[msg.channelId];
+    const adventure: Adventure = this._adventures[msg.channelId];
     if (!adventure) {
       if (!msg.content.toLowerCase().startsWith(CHAT_INVOKE_CMD)) return;
       
@@ -24,7 +25,17 @@ export class DungeonMaster {
       
     } else {
       // Continue existing adventure
-      adventure.addPlayerInput(msg);
+      // adventure.addPlayerInput(msg);
     }
+  }
+  
+  public async ProcessInteraction(ctx: ButtonContext) {
+    const adventure: Adventure = this._adventures[ctx.channelId];
+    if (!adventure) {
+      console.log('Button click but no active adventure.');
+      return;
+    }
+    
+    adventure.handlePlayerInput(ctx);
   }
 }

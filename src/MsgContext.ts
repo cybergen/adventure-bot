@@ -1,6 +1,7 @@
 ﻿import { Message } from 'discord.js';
+import { InputContext } from './InputContext';
 
-export class MsgContext {
+export class MsgContext extends InputContext {
   
   private readonly _message: Message;
   
@@ -12,11 +13,8 @@ export class MsgContext {
     return this._message.content;
   }
   
-  public get author(): { id: string, name: string } {
-    return {
-      id: this._message.author.id,
-      name: this._message.member.displayName
-    };
+  public get userId(): string {
+    return this._message.author.id;
   }
   
   public get guild() {
@@ -24,31 +22,21 @@ export class MsgContext {
   }
   
   public constructor(message: Message) {
+    super(message);
     this._message = message;
   }
   
-  public async reply(msg: string) {
-    await this._message.reply({
-      content: msg,
-      allowedMentions: { repliedUser: true }
-    });
-  }
-  
-  public async continue(msg: string): Promise<MsgContext> {
-    const sentMsg = await this._message.channel.send(msg);
-    return new MsgContext(sentMsg);
-  }
-  
-  public async getReactions(time: number): Promise<Array<{ id: string, name: string }>> {
+  public async getReactions(time: number): Promise<Array<string>> {
     const collector = this._message.createReactionCollector({ time });
     
-    const users = [];
+    const users: string[] = [];
     
     collector.on('collect', (reaction, user) => {
       console.log(`Collected ${reaction.emoji.name} from ${user.tag}`);
       
       if (user.bot) return;
-      users.push({ id: user.id, name: user.displayName });
+      if (users.includes(user.id)) return;
+      users.push(user.id);
     });
     await new Promise(resolve => collector.on('end', resolve));
     
