@@ -6,7 +6,7 @@ import { Services } from './services/Services';
 import { Delay } from './Delay';
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up!";
+const describeResultsMessage = "Time's up! The players should have supplied their actions. Please describe what happens to them in 2 sentences each.";
 
 enum AdventureState {
   Idle = 'idle',
@@ -85,8 +85,8 @@ export class Adventure extends Emitter<AdventureEvents> {
       player: msg.author.name,
       reply: msg.content
     });
-    const response = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":input});
-    msg.reply(response);
+    this._currentStageContext.push({"role":"user","content":input});
+    msg.reply(`*Action received! You'll get your results at the end of the stage.*`);
   }
   
   private async runAdventure() {
