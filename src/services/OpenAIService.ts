@@ -27,7 +27,7 @@ export class OpenAIService {
   }
 
   public async getStageHistory(stageContext: object[], history: string) {
-    let fullPrompt = "Now return an updated version of course history and player history in the following format:\n\n" + history;
+    let fullPrompt = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc), in the following format:\n\n" + history;
     return await this.appendToStageChatAndReturnLLMResponse(stageContext, {"role":"user","content":fullPrompt});
   }
 
