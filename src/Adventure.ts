@@ -7,7 +7,7 @@ import { ButtonContext } from './ButtonContext';
 import { InteractionIntent } from './discord-utils/InteractionId';
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up!";
+const describeResultsMessage = "Time's up! The players should have supplied their actions. Please describe what happens to them in 2 sentences each.";
 
 enum AdventureState {
   Idle = 'idle',
@@ -85,19 +85,6 @@ export class Adventure extends Emitter<AdventureEvents> {
     setTimeout(this.runAdventure.bind(this), 1000);
   }
   
-  // Old text based method of entry
-  // public async addPlayerInput(msg: MsgContext) {
-  //   // TODO: Map playerId -> name
-  //   const input = JSON.stringify({
-  //     player: msg.author.name,
-  //     reply: msg.content
-  //   });
-  //   this._currentStageContext.push(input);
-  //   msg.reply('Input received. TODO: jazz this up a smidge?');
-  //   // const response = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":input});
-  //   // msg.reply(response);
-  // }
-  
   public async handlePlayerInput(ctx: ButtonContext) {
     switch (ctx.intent) {
       case InteractionIntent.Input:
@@ -119,8 +106,8 @@ export class Adventure extends Emitter<AdventureEvents> {
           ephemeral: true,
           plainTxt: 'Received! Should I let your fellow adventurers know of your intent, or keep them in the dark?',
           buttons: [
-            { intent: InteractionIntent.Agree, txt: ':thumbsup:' },
-            { intent: InteractionIntent.Agree, txt: ':thumbsdown:' }
+            {intent: InteractionIntent.Agree, txt: ':thumbsup:'},
+            {intent: InteractionIntent.Agree, txt: ':thumbsdown:'}
           ]
         });
         break;
@@ -137,12 +124,7 @@ export class Adventure extends Emitter<AdventureEvents> {
           plainTxt: `${this._players[ctx.userId]} has acted in secret.`
         });
         break;
-
     }
-    
-    
-    
-    
   }
   
   private async runAdventure() {

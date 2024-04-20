@@ -33,6 +33,7 @@ export abstract class InputContext {
   
   public async reply(msg: OutboundMessage) {
     // TODO: Add a type guard to ensure this can't proc on modal variants
+    // @ts-ignore
     await this._base.reply(this.buildDiscordMessage(msg));
   }
   
