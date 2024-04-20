@@ -16,6 +16,10 @@ export class MsgContext extends InputContext {
   public get userId(): string {
     return this._message.author.id;
   }
+
+  public get userIcon(): string {
+    return this._message.member.displayAvatarURL();
+  }
   
   public get guild() {
     return this._message.guild;

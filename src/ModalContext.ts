@@ -15,6 +15,10 @@ export class ModalContext extends InputContext {
     return this._modal.user.id;
   }
   
+  public get userIcon(): string {
+    return this._modal.user.displayAvatarURL();
+  }
+  
   public get input(): string {
     return this._modal.fields.getTextInputValue(KEY_INPUT);
   }

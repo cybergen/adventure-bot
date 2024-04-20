@@ -118,7 +118,10 @@ export class Adventure extends Emitter<AdventureEvents> {
       case InteractionIntent.Agree:
         ctx.continue({
           segments: [{
-            header: this._players[ctx.userId],
+            user: {
+              name: this._players[ctx.userId],
+              icon: ctx.userIcon
+            },
             body: this._stagePlayerInput[ctx.userId]
           }]
         });

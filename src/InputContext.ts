@@ -11,7 +11,7 @@ import { MsgContext } from './MsgContext';
 import { InteractionId, InteractionIntent } from './discord-utils/InteractionId';
 
 export type ButtonConfig = Array<{txt: string, intent: InteractionIntent}>;
-export type TextSegment = { header: string, body: string };
+export type TextSegment = { user?: { icon: string, name: string }, header?: string, body: string };
 
 export type OutboundMessage = Partial<{
   ephemeral: boolean
@@ -26,6 +26,7 @@ export abstract class InputContext {
   
   public abstract get channelId(): string;
   public abstract get userId(): string;
+  public abstract get userIcon(): string;
   
   protected constructor(base: Message | ButtonInteraction | ModalSubmitInteraction) {
     this._base = base;
@@ -75,10 +76,18 @@ export abstract class InputContext {
   }
   
   private buildEmbeds(embeds: TextSegment[]): EmbedBuilder[] {
-    return embeds.map(e => new EmbedBuilder()
-      .setColor(0x3eb2e5)
-      .setTitle(e.header)
-      .setDescription(e.body)
-    );
+    return embeds.map(e => {
+      const embed = new EmbedBuilder()
+        .setColor(0x3eb2e5)
+        .setDescription(e.body);
+      if (e.header) embed.setTitle(e.header);
+      if (e.user) {
+        embed.setAuthor({
+          name: e.user.name,
+          iconURL: e.user.icon
+        });
+      }
+      return embed;
+    });
   }
 }
