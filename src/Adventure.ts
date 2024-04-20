@@ -8,7 +8,7 @@ import { InteractionIntent } from './discord-utils/InteractionId';
 import * as JSON5 from 'json5'
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up! The players should have supplied their actions. Please describe what happens to them in 2 sentences each.";
+const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each.";
 
 enum AdventureState {
   Idle = 'idle',
