@@ -9,8 +9,7 @@ import {
 } from 'discord.js';
 import { InputContext } from './InputContext';
 import { InteractionId, InteractionIntent } from './discord-utils/InteractionId';
-
-const KEY_INPUT = 'input';
+import { KEY_INPUT, ModalContext } from './ModalContext';
 
 export class ButtonContext extends InputContext {
   
@@ -33,8 +32,7 @@ export class ButtonContext extends InputContext {
     this._interaction = interaction;
   }
   
-  public async spawnModal(): Promise<{ input: string, interaction: ModalSubmitInteraction }>   {
-    console.log('Spawning modal...');
+  public async spawnModal(): Promise<ModalContext>   {
     // TODO: Abstract modal config out so spawnModal is more generic
     await this._interaction.showModal({
       title: 'What would you like to do?',
@@ -53,11 +51,6 @@ export class ButtonContext extends InputContext {
       time: 1000 * 60 * 15 // Longer than the stage but whatevs
     });
     
-    const playerInput = result.fields.getTextInputValue(KEY_INPUT);
-    console.log(`Modal result: ${playerInput}`);
-    return {
-      input: playerInput,
-      interaction: result
-    };
+    return new ModalContext(result);
   }
 }

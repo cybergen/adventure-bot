@@ -32,8 +32,7 @@ export abstract class InputContext {
   }
   
   public async reply(msg: OutboundMessage) {
-    // TODO: Add a type guard to ensure this can't proc on modal variants
-    // @ts-ignore
+    // @ts-ignore  TODO: Figure out this type issue
     await this._base.reply(this.buildDiscordMessage(msg));
   }
   
@@ -53,12 +52,19 @@ export abstract class InputContext {
   }
   
   private buildButtonRow(config: ButtonConfig): MessageCreateOptions['components'] {
-    const buttons: ButtonBuilder[] = config.map(b => new ButtonBuilder({
-      type: ComponentType.Button,
-      customId: InteractionId.create(this.channelId, b.intent),
-      label: b.txt,
-      style: ButtonStyle.Secondary,
-    }));
+    const buttons: ButtonBuilder[] = config.map(b => {
+      const button = new ButtonBuilder()
+        .setCustomId(InteractionId.create(this.channelId, b.intent))
+        .setStyle(ButtonStyle.Secondary);
+      if (b.txt.startsWith(':') && b.txt.endsWith(':')) {
+        // button.setEmoji(b.txt);
+        // TODO: Fix this silliness.
+        button.setLabel(b.txt);
+      } else {
+        button.setLabel(b.txt);
+      }
+      return button;
+    });
     
     return [
       new ActionRowBuilder<ButtonBuilder>({

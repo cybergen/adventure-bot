@@ -5,6 +5,7 @@ import { Services } from './services/Services';
 import { Delay } from './Delay';
 import { ButtonContext } from './ButtonContext';
 import { InteractionIntent } from './discord-utils/InteractionId';
+import * as JSON5 from 'json5'
 
 //Some commands for the chat bot
 const describeResultsMessage = "Time's up! The players should have supplied their actions. Please describe what happens to them in 2 sentences each.";
@@ -79,7 +80,10 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
     const playerArray = Object.values(this._players);
-    this._courseDescription = eval('(' + await Services.OpenAI.getLLMCourseDescription(params, playerArray) + ')');
+    const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(params, playerArray);
+    console.log(courseDescRaw);
+    this._courseDescription = JSON5.parse(courseDescRaw);
+    console.log(this._courseDescription);
     this._courseDescription.players = playerArray;
     
     setTimeout(this.runAdventure.bind(this), 1000);
@@ -92,22 +96,20 @@ export class Adventure extends Emitter<AdventureEvents> {
         const modalResult = await ctx.spawnModal();
 
         // Store input
-        this._currentStageContext.push(
-          JSON.stringify({
+        this._currentStageContext.push({
             player: this._players[ctx.userId],
             reply: modalResult.input
-          })
-        );
+        });
         // Eventually: Handle users adding multiple prior to replying to privacy.
         this._stagePlayerInput[ctx.userId] = modalResult.input;
 
         // Whisper back, ask about privacy
-        ctx.reply({
+        modalResult.reply({
           ephemeral: true,
           plainTxt: 'Received! Should I let your fellow adventurers know of your intent, or keep them in the dark?',
           buttons: [
-            {intent: InteractionIntent.Agree, txt: ':thumbsup:'},
-            {intent: InteractionIntent.Agree, txt: ':thumbsdown:'}
+            {intent: InteractionIntent.Agree, txt: '👍'},
+            {intent: InteractionIntent.Disagree, txt: '👎'}
           ]
         });
         break;
