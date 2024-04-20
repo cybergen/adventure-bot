@@ -2,9 +2,11 @@
 import { Emitter } from '../Emitter';
 import { CHAT_INVOKE_CMD } from '../Constants';
 import { MsgContext } from '../MsgContext';
+import { ButtonContext } from '../ButtonContext';
 
 export interface DiscordEvents {
   messageRx: MsgContext
+  btnClick: ButtonContext
 }
 
 export class DiscordService extends Emitter<DiscordEvents> {
@@ -46,7 +48,9 @@ export class DiscordService extends Emitter<DiscordEvents> {
   }
 
   private async OnInteraction(interaction: Interaction) {
-
+    if (interaction.isButton()) {
+      this.emit('btnClick', new ButtonContext(interaction));
+    }
   }
   
 }
