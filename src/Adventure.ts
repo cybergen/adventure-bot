@@ -122,7 +122,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._startMsg.continue(result);
     
     this._history = await Services.OpenAI.getStageHistory(this._currentStageContext, this._history);
-    console.log(`Received following history response: ${history}`);
+    console.log(`Received following history response: ${this._history}`);
   }
 
   private async endAdventure() {
