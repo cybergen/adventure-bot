@@ -32,10 +32,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     stages: number,
     name: string
   };
-  //Overall history of stages in the course
-  private _courseHistory = [];
-  //History of what has befallen each player over time
-  private _playerHistory = [];
+  private _history = '';
   //Chat-like full text of current stage for coherency (resets for each stage)
   private _currentStageContext = [];
   
@@ -51,7 +48,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     
     this._state = AdventureState.Collecting;
 
-    this._startMsg = await this._startMsg.continue(`*We've got a new adventure starting! React to this message to join the adventure.*`);
+    this._startMsg = await msg.continue(`*We've got a new adventure starting! React to this message to join the adventure.*`);
     const users = await this._startMsg.getReactions(JOIN_DURATION);
     this._players = users.map(u => u.name);
     
@@ -61,13 +58,15 @@ export class Adventure extends Emitter<AdventureEvents> {
       return;
     }
     
-    this._playerHistory.push(...users.map(u => ({
+    let playerHistory = [];
+    playerHistory.push(...users.map(u => ({
       // TODO: Fix this Id<>Name overlap
       'player_id': u.name,
       history: []
     })));
+    this._history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
-    this._courseDescription = eval('(' + await Services.OpenAI.getLLMCourseDescription(prompt, this._players) + ')');
+    this._courseDescription = eval('(' + await Services.OpenAI.getLLMCourseDescription(params, this._players) + ')');
     this._courseDescription.players = this._players;
     
     setTimeout(this.runAdventure.bind(this), 1000);
@@ -107,7 +106,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._currentStageContext = [];
     //Then trigger the start of new stage chat completion
     
-    const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._courseHistory, this._playerHistory);
+    const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
     await this._startMsg.continue(result);
   }
 
@@ -115,30 +114,13 @@ export class Adventure extends Emitter<AdventureEvents> {
     const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
     this._startMsg.continue(result);
     
-    const history = await Services.OpenAI.getStageHistory(this._courseHistory, this._playerHistory);
+    this._history = await Services.OpenAI.getStageHistory(this._currentStageContext, this._history);
     console.log(`Received following history response: ${history}`);
-
-    //Parse history updates from history string
-    const sections = history.split(/\n(?=Course History:|Player History:)/);
-    this._courseHistory = this.parseSection(sections[0].split('Course History:')[1].trim());
-    const playerHistoryRaw = sections[1].split('Player History:')[1].trim();
-
-    // Since Player History contains multiple objects, split them and parse each one.
-    const playerHistoryObjects = playerHistoryRaw.split(/(?=^{)/);
-    this._playerHistory = playerHistoryObjects.map(obj => this.parseSection(obj.trim()));
-    console.log("Course Description:", this._courseDescription);
-    console.log("Course History:", this._courseHistory);
-    console.log("Player History:", this._playerHistory);
   }
 
   private async endAdventure() {
-    this._startMsg.continue(await Services.OpenAI.getAdventureResults(this._courseDescription, this._courseHistory, this._playerHistory));
+    this._startMsg.continue(await Services.OpenAI.getAdventureResults(this._courseDescription, this._history));
     
     this.emit('concluded');
-  }
-
-  // Helper function to parse safely using new Function
-  private parseSection(data) {
-    return new Function(`return ${data};`)();
   }
 }

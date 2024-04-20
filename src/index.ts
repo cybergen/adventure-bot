@@ -7,7 +7,6 @@ import { Services } from './services/Services';
   const dm = new DungeonMaster();
   
   Services.Discord.on('messageRx', ctx => {
-    console.log('hmm');
     dm.ProcessMessage(ctx);
   });
   await Services.Discord.initialize();

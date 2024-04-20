@@ -33,7 +33,6 @@ export class DiscordService extends Emitter<DiscordEvents> {
     if (msg.author.bot) return;
 
     if (!msg.content.startsWith(CHAT_INVOKE_CMD) && msg.type !== MessageType.Reply) {
-      console.log('no-op')
       return;
     }
 
