@@ -49,21 +49,28 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._state = AdventureState.Collecting;
 
     this._startMsg = await msg.continue(`*We've got a new adventure starting! React to this message to join the adventure.*`);
-    const users = await this._startMsg.getReactions(JOIN_DURATION);
-    this._players = users.map(u => u.name);
-    
+    const guild = this._startMsg.guild;
+    let users = await this._startMsg.getReactions(JOIN_DURATION);
     if (users.length === 0) {
       msg.reply(`Nobody signed up! Cancelling this adventure, cowards.`);
       this.emit('concluded');
       return;
     }
     
-    let playerHistory = [];
-    playerHistory.push(...users.map(u => ({
-      // TODO: Fix this Id<>Name overlap
-      'player_id': u.name,
-      history: []
-    })));
+    this._players = [];
+    const playerHistory: Array<{ player_id: string, history: [] }> = [];
+    for (const user of users) {
+      // Handle dupes
+      if (playerHistory.findIndex(h => h.player_id === user.id) > 0) continue;
+      
+      const displayName = (await guild.members.fetch(user.id)).displayName;
+      playerHistory[user.id] = {
+        player_id: displayName,
+        history: []
+      };
+      this._players.push(displayName)
+    }
+    
     this._history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
     this._courseDescription = eval('(' + await Services.OpenAI.getLLMCourseDescription(params, this._players) + ')');

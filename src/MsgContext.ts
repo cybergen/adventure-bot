@@ -19,6 +19,10 @@ export class MsgContext {
     };
   }
   
+  public get guild() {
+    return this._message.guild;
+  }
+  
   public constructor(message: Message) {
     this._message = message;
   }
