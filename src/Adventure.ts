@@ -96,11 +96,12 @@ export class Adventure extends Emitter<AdventureEvents> {
         const modalResult = await ctx.spawnModal();
 
         // Store input
-        this._currentStageContext.push({"role":"user","content": {
-            player: this._players[ctx.userId],
-            reply: modalResult.input
-          }
+        const input = JSON.stringify({
+          player: this._players[ctx.userId],
+          reply: modalResult.input
         });
+        this._currentStageContext.push({"role":"user","content":input});
+        
         // Eventually: Handle users adding multiple prior to replying to privacy.
         this._stagePlayerInput[ctx.userId] = modalResult.input;
 
