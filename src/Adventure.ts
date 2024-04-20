@@ -94,10 +94,12 @@ export class Adventure extends Emitter<AdventureEvents> {
   }
   
   public async handlePlayerInput(ctx: ButtonContext) {
+    console.log(`User: ${this._players[ctx.userId]} intent: ${ctx.intent}`);
     switch (ctx.intent) {
       case InteractionIntent.Input:
         // Prompt the user for input
         const modalResult = await ctx.spawnModal();
+        console.log(`User: ${this._players[ctx.userId]} replied with: ${modalResult.input}`);
 
         // Store input
         const input = JSON.stringify({

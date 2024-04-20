@@ -95,19 +95,19 @@ const courseDescriptionSystemPrompt = `
 You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, a difficulty, and a theme prompt. Your outputted data structure should look like so:
 
 {
-  name: 'The Wizard\'s Challenge',
-  theme: 'Magical quest through enchanted realms to unlock a wizard\'s ultimate power',
-  difficulty: 'Savage',
+  name: "The Wizard's Challenge",
+  theme: "Magical quest through enchanted realms to unlock a wizard's ultimate power",
+  difficulty: "Savage",
   stages: 5,
-  players: ['vimes', 'ghost_tree']
+  players: ["vimes", "ghost_tree"]
 }
 
 {
-  name: 'Battle of the Brains',
-  theme: 'A light-hearded computer science romp',
-  difficulty: 'Easy',
+  name: "Battle of the Brains",
+  theme: "A light-hearded computer science romp",
+  difficulty: "Easy",
   stages: 10,
-  players: ['telomerase', 'Candelabra2']
+  players: ["telomerase", "Candelabra2"]
 }
 
 Assume that each stage takes around 2 minutes, and set a stage count based on that. Be sure to come up with a witty name!
@@ -120,31 +120,31 @@ Your initial input will look like so:
 
 Course Description:
 {
-  name: 'Under the Mountains of Madness',
-  theme: 'Grim fantasy dungeon delve to save a sick elf',
-  difficulty: 'Medium',
+  name: "Under the Mountains of Madness",
+  theme: "Grim fantasy dungeon delve to save a sick elf",
+  difficulty: "Medium",
   stages: 10,
-  players: ['Antler220', 'ghost_tree']
+  players: ["Antler220", "ghost_tree"]
 }
 
 Course History:
 [
-  'Dungeon entrance encountered in a forest glade',
-  'Attacked by a series of spiders',
-  'Swinging blade trap across a narrow walkway',
-  'Skeletons and a molerat necromancer attack',
-  'Soul-eating machine that can dispense a crystal',
+  "Dungeon entrance encountered in a forest glade",
+  "Attacked by a series of spiders",
+  "Swinging blade trap across a narrow walkway",
+  "Skeletons and a molerat necromancer attack",
+  "Soul-eating machine that can dispense a crystal",
 ]
 
 Player History: 
 [
   {
-    player_id: 'Antler220',
-    history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
+    player_id: "Antler220",
+    history: ["Tried and failed to lift a tree on stage 1", "Executed a perfect backflip to save a friend on stage 3", "Got a sword and a molerat corpse in stage 4", "Broke sword in stage 6"]
   },
   {
-    player_id: 'ghost_tree',
-    history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
+    player_id: "ghost_tree",
+    history: ["Ran all out in stage 2, becoming exhausted", "Died to a naked molerat on stage 4"]
   }
 ]
 
