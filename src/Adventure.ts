@@ -40,6 +40,9 @@ export class Adventure extends Emitter<AdventureEvents> {
   
   private _currentStage = 0;
   private _stagePlayerInput: Record<string, string> = {}; // Mappings of Id->PlayerInput
+  private _stageRepliedPlayers = [];
+  private _stageTimeElapsed = false;
+  private _stageTimer = null;
   
   public async initialize(msg: MsgContext) {
     const params = msg.content.slice('!adventure'.length).trim();
@@ -104,6 +107,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         
         // Eventually: Handle users adding multiple prior to replying to privacy.
         this._stagePlayerInput[ctx.userId] = modalResult.input;
+        this._stageRepliedPlayers.push(ctx.userId);
 
         // Whisper back, ask about privacy
         modalResult.reply({
@@ -139,9 +143,19 @@ export class Adventure extends Emitter<AdventureEvents> {
     while (this._currentStage < this._courseDescription.stages) {
       await this.startStage();
       this._state = AdventureState.InputStage;
-      await Delay.ms(STAGE_RESPONSE_DURATION);
       
-      await this._startMsg.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
+      this.startStageTimer();
+      while (!this._stageTimeElapsed && !this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+        await Delay.ms(100);
+      }
+      this.cancelStageTimer();
+      
+      if (this._stageTimeElapsed) {
+        this._startMsg.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
+      } else {
+        this._startMsg.continue({ plainTxt: `__**All actions in! Getting stage results!**__` });
+      }
+
       this._state = AdventureState.PostStage;
       await this.endStage();
       await Delay.ms(POST_STAGE_DURATION);
@@ -150,11 +164,26 @@ export class Adventure extends Emitter<AdventureEvents> {
     await this.endAdventure();
   }
 
+  
+
+  private postIfMissingInput(ctx: ButtonContext, fullPlayerSet: [], currentRepliedSet: []): void {
+    if (fullPlayerSet.every(element => currentRepliedSet.includes(element))) {
+      return;
+    }
+
+    const missingPlayers = fullPlayerSet.filter(element => !currentRepliedSet.includes(element)).join(", ");
+    ctx.continue({
+      plainTxt: `Still awaiting actions for: ${missingPlayers}`
+    });
+  }
+
   private async startStage() {
     console.log(`\n\n==========Starting stage ${this._currentStage}`);
     //First clear the overall stage chat sequence
     this._currentStageContext = [];
     this._stagePlayerInput = {};
+    this._stageTimeElapsed = false;
+    this._stageRepliedPlayers = [];
     //Then trigger the start of new stage chat completion
     
     const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
@@ -163,7 +192,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         header: `Stage ${this._currentStage+1}`,
         body: result
       }],
-      buttons: [{ txt: 'Add Response', intent: InteractionIntent.Input }]
+      buttons: [{ txt: 'Do Something!', intent: InteractionIntent.Input }]
     });
   }
 
@@ -189,5 +218,18 @@ export class Adventure extends Emitter<AdventureEvents> {
     });
     
     this.emit('concluded');
+  }
+
+  private startStageTimer(): void {
+    this._stageTimer = setTimeout(() => {
+      this._stageTimeElapsed = true;
+    }, STAGE_RESPONSE_DURATION);
+  }
+
+  private cancelStageTimer(): void {
+    if (this._stageTimer) {
+      clearTimeout(this._stageTimer);
+      this._stageTimer = null;
+    }
   }
 }
