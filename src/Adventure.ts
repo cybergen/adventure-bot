@@ -31,6 +31,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   //Initial plan for course
   private _courseDescription: {
     players: string[],
+    difficulty: string,
     stages: number,
     name: string
   };
@@ -126,11 +127,13 @@ export class Adventure extends Emitter<AdventureEvents> {
             body: this._stagePlayerInput[ctx.userId]
           }]
         });
+        this.postIfMissingInput(ctx, this._courseDescription.players, this._stageRepliedPlayers);
         break;
       case InteractionIntent.Disagree:
         ctx.continue({
           plainTxt: `${this._players[ctx.userId]} has acted in secret.`
         });
+        this.postIfMissingInput(ctx, this._courseDescription.players, this._stageRepliedPlayers);
         break;
     }
   }
@@ -162,19 +165,6 @@ export class Adventure extends Emitter<AdventureEvents> {
       this._currentStage++;
     }
     await this.endAdventure();
-  }
-
-  
-
-  private postIfMissingInput(ctx: ButtonContext, fullPlayerSet: [], currentRepliedSet: []): void {
-    if (fullPlayerSet.every(element => currentRepliedSet.includes(element))) {
-      return;
-    }
-
-    const missingPlayers = fullPlayerSet.filter(element => !currentRepliedSet.includes(element)).join(", ");
-    ctx.continue({
-      plainTxt: `Still awaiting actions for: ${missingPlayers}`
-    });
   }
 
   private async startStage() {
@@ -218,6 +208,17 @@ export class Adventure extends Emitter<AdventureEvents> {
     });
     
     this.emit('concluded');
+  }
+
+  private postIfMissingInput(ctx: ButtonContext, fullPlayerSet: string[], currentRepliedSet: string[]): void {
+    if (fullPlayerSet.every(element => currentRepliedSet.includes(element))) {
+      return;
+    }
+
+    const missingPlayers = fullPlayerSet.filter(element => !currentRepliedSet.includes(element)).join(", ");
+    ctx.continue({
+      plainTxt: `Still awaiting actions for: ${missingPlayers}`
+    });
   }
 
   private startStageTimer(): void {
