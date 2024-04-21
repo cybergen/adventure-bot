@@ -51,6 +51,10 @@ export class Adventure extends Emitter<AdventureEvents> {
     
     this._startMsg = await config.continue({
       segments: [{
+        user: {
+          name: config.userName,
+          icon: config.userIcon
+        },
         header: 'Adventure Awaits!',
         body: `Prompt: ${config.description}\nDifficulty: ${config.difficulty} \n\n*We've got a new adventure starting! React to this message to join the adventure.*`
       }]
