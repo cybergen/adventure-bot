@@ -6,21 +6,27 @@ import { InvokeContext } from './InvokeContext';
 export class DungeonMaster {
   
   // Eventually: Backup this state out of runtime memory.
-  private _adventures: Adventure[] = [];
+  private _adventures: Record<string, Adventure> = {};
   
   public async StartAdventure(config: InvokeContext) {
-    const adventure: Adventure = this._adventures[config.channelId];
-    if (!adventure) {
-      // Spinup new adventure
-      const adventure = new Adventure();
-      adventure.on('concluded', () => {
-        this._adventures.splice(this._adventures.indexOf(adventure), 1);
+    const existing: Adventure = this._adventures[config.channelId];
+    if (existing) {
+      config.reply({
+        ephemeral: true,
+        plainTxt: "An adventure is currently ongoing in this channel!"
       });
-
-      this._adventures[config.channelId] = adventure;
-
-      adventure.initialize(config);
+      return;
     }
+
+    // Spinup new adventure
+    const adventure = new Adventure();
+    this._adventures[config.channelId] = adventure;
+
+    adventure.on('concluded', () => {
+      delete this._adventures[config.channelId];
+    });
+    
+    adventure.initialize(config);
   }
   
   public async ProcessInteraction(ctx: ButtonContext) {
