@@ -4,9 +4,10 @@ import { Services } from './services/Services';
 import { Delay } from './Delay';
 import { ButtonContext } from './ButtonContext';
 import { InteractionIntent } from './discord-utils/InteractionId';
-import * as JSON5 from 'json5'
+import * as JSON5 from 'json5';
 import { InvokeContext } from './InvokeContext';
 import { MsgContext } from './MsgContext';
+import { OutboundMessage } from './InputContext';
 
 //Some commands for the chat bot
 const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
@@ -118,57 +119,25 @@ export class Adventure extends Emitter<AdventureEvents> {
         });
         break;
       case InteractionIntent.Agree:
-        ctx.markResolved();
-        this._stageRepliedPlayers.push(this._players[ctx.userId]);
-        if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
-          const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
-          ctx.continue({
-            segments: [{
-              user: {
-                name: this._players[ctx.userId],
-                icon: ctx.userIcon
-              },
-              body: this._stagePlayerInput[ctx.userId] + `\n\nStill awaiting actions for: ${missingPlayers}`
-            }]
-          });
-        } else {
-          ctx.continue({
-            segments: [{
-              user: {
-                name: this._players[ctx.userId],
-                icon: ctx.userIcon
-              },
-              body: this._stagePlayerInput[ctx.userId]
-            }]
-          });
-        }
-        break;
       case InteractionIntent.Disagree:
+      {
         ctx.markResolved();
         this._stageRepliedPlayers.push(this._players[ctx.userId]);
-        if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
-          const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
-          ctx.continue({
-            segments: [{
-              user: {
-                name: this._players[ctx.userId],
-                icon: ctx.userIcon
-              },
-              body: `_Did something, but it's a secret_\n\nStill awaiting actions for: ${missingPlayers}`
-            }]
-          });
-        } else {
-          ctx.continue({
-            segments: [{
-              user: {
-                name: this._players[ctx.userId],
-                icon: ctx.userIcon
-              },
-              body: `_Did something, but it's a secret_`
-            }]
-          });
-        }
+
+        const msgSegments: OutboundMessage['segments'] = [{
+          user: {
+            name: this._players[ctx.userId],
+            icon: ctx.userIcon
+          },
+          body: ctx.intent === InteractionIntent.Agree ? this._stagePlayerInput[ctx.userId] : `_Did something, but it's a secret_`;
+        }];
+
+        const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
+        if (missingPlayers) msgSegments.push({ body: `Still awaiting actions for: ${missingPlayers}`});
+
+        ctx.continue({ segments: msgSegments });
         break;
+      }
     }
   }
   
