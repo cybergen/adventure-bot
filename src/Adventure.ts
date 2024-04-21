@@ -122,6 +122,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         });
         break;
       case InteractionIntent.Agree:
+        ctx.markResolved();
         this._stageRepliedPlayers.push(this._players[ctx.userId]);
         if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
           const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
@@ -147,6 +148,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         }
         break;
       case InteractionIntent.Disagree:
+        ctx.markResolved();
         this._stageRepliedPlayers.push(this._players[ctx.userId]);
         if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
           const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");

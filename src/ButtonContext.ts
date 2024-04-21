@@ -60,4 +60,8 @@ export class ButtonContext extends InputContext {
     
     return new ModalContext(result);
   }
+  
+  public markResolved() {
+    this._interaction.deferReply();
+  }
 }
