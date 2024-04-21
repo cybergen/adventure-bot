@@ -7,7 +7,7 @@ import {
   TextInputBuilder,
   TextInputStyle
 } from 'discord.js';
-import { InputContext } from './InputContext';
+import { InputContext, OutboundMessage } from './InputContext';
 import { InteractionId, InteractionIntent } from './discord-utils/InteractionId';
 import { KEY_INPUT, ModalContext } from './ModalContext';
 
@@ -71,6 +71,19 @@ export class ButtonContext extends InputContext {
     this._interaction.update({
       content: 'You\'re all set! When everyone has answered, the game will continue.',
       components: []
+    });
+  }
+  
+  public async markThinking() {
+    await this._interaction.deferReply();
+  }
+  
+  public followUp(msg: OutboundMessage) {
+    this._interaction.followUp({
+      ...this.buildDiscordMessage(msg),
+      allowedMentions: {
+        repliedUser: false
+      }
     });
   }
 }

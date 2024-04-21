@@ -8,6 +8,7 @@ import * as JSON5 from 'json5';
 import { InvokeContext } from './InvokeContext';
 import { MsgContext } from './MsgContext';
 import { OutboundMessage } from './InputContext';
+import { userMention } from 'discord.js';
 
 //Some commands for the chat bot
 const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
@@ -28,6 +29,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   
   private _state: AdventureState;
   private _startMsg: MsgContext;
+  private _lastInteraction: ButtonContext;
   private _players: Record<string, string> = {}; // Mapping of Id->DisplayName
 
   //Initial plan for course
@@ -42,8 +44,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   private _currentStageContext = [];
   
   private _currentStage = 0;
-  private _stagePlayerInput: Record<string, string> = {}; // Mappings of Id->PlayerInput
-  private _stageRepliedPlayers = [];
+  private _stagePlayerInput: Record<string, { input: string, public: boolean }> = {}; // Mappings of Id->PlayerInput
   private _stageTimeElapsed = false;
   private _stageTimer = null;
   
@@ -57,7 +58,11 @@ export class Adventure extends Emitter<AdventureEvents> {
           icon: config.userIcon
         },
         header: 'Adventure Awaits!',
-        body: `Prompt: ${config.description}\nDifficulty: ${config.difficulty} \n\n*We've got a new adventure starting! React to this message to join the adventure.*`
+        meta: [
+          { name: 'Prompt', value: config.description, short: false },
+          { name: 'Difficulty', value: config.difficulty, short: true }
+        ],
+        body: `*We've got a new adventure starting! React to this message to join the adventure.*`
       }]
     });
     const guild = this._startMsg.guild;
@@ -94,6 +99,14 @@ export class Adventure extends Emitter<AdventureEvents> {
     console.log(`User: ${this._players[ctx.userId]} intent: ${ctx.intent}`);
     switch (ctx.intent) {
       case InteractionIntent.Input:
+        if (!(ctx.userId in this._players)) {
+          ctx.reply({
+            ephemeral: true,
+            plainTxt: `You didn't sign up for this adventure. Fear not, just join the next one!`
+          });
+          return;
+        }
+        
         // Prompt the user for input
         const modalResult = await ctx.spawnModal();
         console.log(`User: ${this._players[ctx.userId]} replied with: ${modalResult.input}`);
@@ -106,7 +119,10 @@ export class Adventure extends Emitter<AdventureEvents> {
         this._currentStageContext.push({"role":"user","content":input});
         
         // Eventually: Handle users adding multiple prior to replying to privacy.
-        this._stagePlayerInput[ctx.userId] = modalResult.input;
+        this._stagePlayerInput[ctx.userId] = {
+          input: modalResult.input,
+          public: null
+        };
 
         // Whisper back, ask about privacy
         modalResult.reply({
@@ -121,21 +137,45 @@ export class Adventure extends Emitter<AdventureEvents> {
       case InteractionIntent.Agree:
       case InteractionIntent.Disagree:
       {
+        this._lastInteraction = ctx;
         ctx.markResolved();
-        this._stageRepliedPlayers.push(this._players[ctx.userId]);
-
+        
+        // Record intent, and generate echo content.
+        let displayMsg: string;
+        if (ctx.intent === InteractionIntent.Agree) {
+          this._stagePlayerInput[ctx.userId].public = true;
+          displayMsg = this._stagePlayerInput[ctx.userId].input;
+        } else {
+          this._stagePlayerInput[ctx.userId].public = false;
+          displayMsg = `_Did something, but it's a secret_`
+        }
+        
         const msgSegments: OutboundMessage['segments'] = [{
           user: {
             name: this._players[ctx.userId],
             icon: ctx.userIcon
           },
-          body: ctx.intent === InteractionIntent.Agree ? this._stagePlayerInput[ctx.userId] : `_Did something, but it's a secret_`
+          body: displayMsg 
         }];
 
-        const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
-        if (missingPlayers) msgSegments.push({ body: `Still awaiting actions for: ${missingPlayers}`});
+        // Augment response if input is still required
+        const missingPlayers = this.awaitingPlayerInput();
+        console.log(`Missing player input still? ${missingPlayers}`);
+        if (missingPlayers) {
+          const missingNames = [];
+          for (const id in this._players) {
+            if (id in this._stagePlayerInput) continue;
+            missingNames.push(this._players[id]);
+          }
+          msgSegments.push({ body: `Still awaiting actions for: ${missingNames.join(', ')}`});
+        }
 
-        ctx.continue({ segments: msgSegments });
+        // Echo player's input to channel, THEN handle ack.
+        // Use a race incase Discord's API is slow, so we also get the ack outbound before the 3s window closes.
+        await Promise.race([
+          ctx.continue({ segments: msgSegments }),
+          Delay.ms(1000)
+        ]);
         break;
       }
     }
@@ -143,7 +183,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   
   private async runAdventure() {
     await this._startMsg.continue({
-      segments: [{ header: 'Adventure Start', body: `*The adventure "${this._courseDescription.name}" begins with the following brave souls: ${this._courseDescription.players.join(', ')}*` }]
+      segments: [{ header: this._courseDescription.name, body: `*The adventure begins with the following brave souls: ${this._courseDescription.players.join(', ')}*\n\n` }]
     });
     
     while (this._currentStage < this._courseDescription.stages) {
@@ -151,16 +191,17 @@ export class Adventure extends Emitter<AdventureEvents> {
       this._state = AdventureState.InputStage;
       
       this.startStageTimer();
-      while (!this._stageTimeElapsed && !this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+      while (!this._stageTimeElapsed && this.awaitingPlayerInput()) {
         await Delay.ms(100);
       }
       this.cancelStageTimer();
       
       if (this._stageTimeElapsed) {
-        this._startMsg.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
-      } else {
-        this._startMsg.continue({ plainTxt: `__**All actions in! Getting stage results!**__` });
+        this._lastInteraction.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
       }
+      
+      // Artifical delay to ensure the last player's input is echoed back before anything else.
+      await Delay.ms(250);
 
       this._state = AdventureState.PostStage;
       await this.endStage();
@@ -176,13 +217,12 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._currentStageContext = [];
     this._stagePlayerInput = {};
     this._stageTimeElapsed = false;
-    this._stageRepliedPlayers = [];
     //Then trigger the start of new stage chat completion
     
     const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
     await this._startMsg.continue({
       segments: [{
-        header: `Stage ${this._currentStage+1}`,
+        header: `${this._courseDescription.name} // Stage ${this._currentStage+1}`,
         body: result
       }],
       buttons: [{ txt: 'Do Something!', intent: InteractionIntent.Input }]
@@ -191,10 +231,33 @@ export class Adventure extends Emitter<AdventureEvents> {
 
   private async endStage() {
     const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
-    this._startMsg.continue({
+    
+    const resultParts = result.split('\n');
+    // This is disgusting, but let's fucking go.
+    // Maybe change the LLM to respond with users in a [<name>] type of keyed format to handle edge cases with someone's displayName trolling (ex: the)
+    for (const id in this._players) {
+      const playerName = this._players[id];
+     
+      // For each player, find the result part that includes their name earliest.
+      let lowestIndexInString = Infinity;
+      let lowestPositionInArr = -1;
+      for (let i = 0; i < resultParts.length; i++) {
+        const nameIndex = resultParts[i].indexOf(playerName);
+        if (nameIndex < 0) continue;
+        if (nameIndex >= lowestIndexInString) continue;
+        lowestIndexInString = nameIndex;
+        lowestPositionInArr = i;
+      }
+      
+      if (lowestPositionInArr === -1) continue;
+      // Intentionally replace only the first occurence of their name?
+      resultParts[lowestPositionInArr] = resultParts[lowestPositionInArr].replace(playerName, userMention(id));
+    }
+    
+    this._lastInteraction.followUp({
       segments: [{
-        header: `Stage ${this._currentStage+1} Outcome`,
-        body: result
+        header: `${this._courseDescription.name} // Stage ${this._currentStage+1} Outcome`,
+        body: resultParts.join('\n')
       }]
     });
     
@@ -205,7 +268,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   private async endAdventure() {
     this._startMsg.continue({
       segments: [{
-        header: `Adventure Outcome`,
+        header: `${this._courseDescription.name} // Adventure Outcome`,
         body: await Services.OpenAI.getAdventureResults(this._courseDescription, this._history)
       }]
     });
@@ -224,5 +287,18 @@ export class Adventure extends Emitter<AdventureEvents> {
       clearTimeout(this._stageTimer);
       this._stageTimer = null;
     }
+  }
+  
+  private awaitingPlayerInput(): boolean {
+    // Check for someone who hasn't answered at all.
+    const missingInput = Object.keys(this._players).length !== Object.keys(this._stagePlayerInput).length;
+    if (missingInput) return true;
+    
+    // Check for someone pending the visibility prompt.
+    for (const id in this._stagePlayerInput) {
+      if (typeof this._stagePlayerInput[id].public !== 'boolean') return true;
+    }
+    
+    return false;
   }
 }

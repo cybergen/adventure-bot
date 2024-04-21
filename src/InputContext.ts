@@ -3,15 +3,20 @@ import {
   ButtonBuilder,
   ButtonInteraction,
   ButtonStyle, ChatInputCommandInteraction,
-  ComponentType, EmbedBuilder,
+  ComponentType, EmbedBuilder, InteractionReplyOptions,
   Message,
-  MessageCreateOptions, ModalSubmitInteraction
+  MessageCreateOptions, MessagePayload, MessageReplyOptions, ModalSubmitInteraction
 } from 'discord.js';
 import { InteractionId, InteractionIntent } from './discord-utils/InteractionId';
 import { MsgContext } from './MsgContext';
 
 export type ButtonConfig = Array<{txt: string, intent: InteractionIntent}>;
-export type TextSegment = { user?: { icon: string, name: string }, header?: string, body: string };
+export type TextSegment = { 
+  user?: { icon: string, name: string, footer?: boolean }, 
+  header?: string, 
+  body: string,
+  meta?: Array<{name: string, value: string, short: boolean}>
+};
 
 export type OutboundMessage = Partial<{
   ephemeral: boolean
@@ -42,9 +47,8 @@ export abstract class InputContext {
     return new MsgContext(sentMsg);
   }
   
-  private buildDiscordMessage(msg: OutboundMessage): object {
-    // TODO: Type this properly
-    const request: any = {};
+  protected buildDiscordMessage(msg: OutboundMessage): MessageReplyOptions & InteractionReplyOptions {
+    const request: MessageReplyOptions & InteractionReplyOptions = <any> {};
     if (msg.ephemeral) request.ephemeral = true;
     if (msg.plainTxt) request.content = msg.plainTxt;
     if (msg.buttons) request.components = this.buildButtonRow(msg.buttons);
@@ -82,10 +86,26 @@ export abstract class InputContext {
         .setDescription(e.body);
       if (e.header) embed.setTitle(e.header);
       if (e.user) {
-        embed.setAuthor({
-          name: e.user.name,
-          iconURL: e.user.icon
-        });
+        if (e.user.footer) {
+          embed.setFooter({
+            iconURL: e.user.icon,
+            text: e.user.name
+          });
+        } else {
+          embed.setAuthor({
+            name: e.user.name,
+            iconURL: e.user.icon
+          });
+        }
+      }
+      if (e.meta) {
+        for (const entry of e.meta) {
+          embed.addFields({
+            name: entry.name,
+            value: entry.value,
+            inline: entry.short
+          });
+        }
       }
       return embed;
     });
