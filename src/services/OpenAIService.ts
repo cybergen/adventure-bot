@@ -27,7 +27,7 @@ export class OpenAIService {
   }
 
   public async getStageHistory(stageContext: object[], history: string) {
-    let fullPrompt = "Now return an updated version of course history and player history in the following format:\n\n" + history;
+    let fullPrompt = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc), in the following format:\n\n" + history;
     return await this.appendToStageChatAndReturnLLMResponse(stageContext, {"role":"user","content":fullPrompt});
   }
 
@@ -92,62 +92,65 @@ Prompt strings
 */
 
 const courseDescriptionSystemPrompt = `
-You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, and a theme prompt. Your outputted data structure should look like so:
+You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, a difficulty, and a theme prompt. Your outputted data structure should look like so:
 
 {
-  name: 'The Wizard\'s Challenge',
-  theme: 'Magical quest through enchanted realms to unlock a wizard\'s ultimate power',
+  name: "The Wizard's Challenge",
+  theme: "Magical quest through enchanted realms to unlock a wizard's ultimate power",
+  difficulty: "Savage",
   stages: 5,
-  players: ['vimes', 'ghost_tree']
+  players: ["vimes", "ghost_tree"]
 }
 
 {
-  name: 'Battle of the Brains',
-  theme: 'A light-hearded computer science romp',
+  name: "Battle of the Brains",
+  theme: "A light-hearded computer science romp",
+  difficulty: "Easy",
   stages: 10,
-  players: ['telomerase', 'Candelabra2']
+  players: ["telomerase", "Candelabra2"]
 }
 
 Assume that each stage takes around 2 minutes, and set a stage count based on that. Be sure to come up with a witty name!
 `;
 
 const stageSystemPrompt = `
-You are a pithy and sarcastic discord bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on how they respond. The challenge is just one of many stages in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage. You will handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
+You are a pithy and sarcastic discord bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on difficulty level of the course and how they respond. The challenge is a single stage in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage. You will handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
 
 Your initial input will look like so:
 
 Course Description:
 {
-  name: 'Under the Mountains of Madness',
-  theme: 'Grim fantasy dungeon delve to save a sick elf',
+  name: "Under the Mountains of Madness",
+  theme: "Grim fantasy dungeon delve to save a sick elf",
+  difficulty: "Medium",
   stages: 10,
-  players: ['Antler220', 'ghost_tree']
+  players: ["Antler220", "ghost_tree"]
 }
 
 Course History:
 [
-  'Dungeon entrance encountered in a forest glade',
-  'Attacked by a series of spiders',
-  'Swinging blade trap across a narrow walkway',
-  'Skeletons and a molerat necromancer attack',
-  'Soul-eating machine that can dispense a crystal',
+  "Dungeon entrance encountered in a forest glade",
+  "Attacked by a series of spiders",
+  "Swinging blade trap across a narrow walkway",
+  "Skeletons and a molerat necromancer attack",
+  "Soul-eating machine that can dispense a crystal",
 ]
 
 Player History: 
 [
   {
-    player_id: 'Antler220',
-    history: ['Tried and failed to lift a tree on stage 1', 'Executed a perfect backflip to save a friend on stage 3', 'Got a sword and a molerat corpse in stage 4', 'Broke sword in stage 6']
+    player_id: "Antler220",
+    history: ["Tried and failed to lift a tree on stage 1", "Executed a perfect backflip to save a friend on stage 3", "Got a sword and a molerat corpse in stage 4", "Broke sword in stage 6"]
   },
   {
-    player_id: 'ghost_tree',
-    history: ['Ran all out in stage 2, becoming exhausted', 'Died to a naked molerat on stage 4']
+    player_id: "ghost_tree",
+    history: ["Ran all out in stage 2, becoming exhausted", "Died to a naked molerat on stage 4"]
   }
 ]
 
 Note that the course and player histories may be empty at first if it is the first stage.
 
-After getting the initial plan and history input, you will describe the new challenge stage in 6 sentences or less.
+After getting the initial plan and history input, you will describe only the current challenge stage directly in front of the players in 6 sentences or less.
 `;
 
 const resultSummarizerSystemPrompt = `
