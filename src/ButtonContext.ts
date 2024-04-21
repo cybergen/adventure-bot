@@ -62,6 +62,8 @@ export class ButtonContext extends InputContext {
   }
   
   public markResolved() {
-    this._interaction.deferReply();
+    this._interaction.update({
+      content: 'You\'re all set! When everyone has answered, the game will continue.'
+    });
   }
 }
