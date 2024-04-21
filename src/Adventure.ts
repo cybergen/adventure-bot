@@ -129,7 +129,7 @@ export class Adventure extends Emitter<AdventureEvents> {
             name: this._players[ctx.userId],
             icon: ctx.userIcon
           },
-          body: ctx.intent === InteractionIntent.Agree ? this._stagePlayerInput[ctx.userId] : `_Did something, but it's a secret_`;
+          body: ctx.intent === InteractionIntent.Agree ? this._stagePlayerInput[ctx.userId] : `_Did something, but it's a secret_`
         }];
 
         const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
