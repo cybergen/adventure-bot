@@ -127,14 +127,20 @@ export class Adventure extends Emitter<AdventureEvents> {
           const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
           ctx.continue({
             segments: [{
-              header: this._players[ctx.userId],
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
               body: this._stagePlayerInput[ctx.userId] + `\n\nStill awaiting actions for: ${missingPlayers}`
             }]
           });
         } else {
           ctx.continue({
             segments: [{
-              header: this._players[ctx.userId],
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
               body: this._stagePlayerInput[ctx.userId]
             }]
           });
@@ -145,11 +151,23 @@ export class Adventure extends Emitter<AdventureEvents> {
         if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
           const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
           ctx.continue({
-            plainTxt: `${this._players[ctx.userId]} has acted in secret.\n\nStill awaiting actions for: ${missingPlayers}`
+            segments: [{
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
+              body: `_Did something, but it's a secret_\n\nStill awaiting actions for: ${missingPlayers}`
+            }]
           });
         } else {
           ctx.continue({
-            plainTxt: `${this._players[ctx.userId]} has acted in secret.`
+            segments: [{
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
+              body: `_Did something, but it's a secret_`
+            }]
           });
         }
         break;

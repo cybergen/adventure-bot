@@ -23,6 +23,10 @@ export class ButtonContext extends InputContext {
     return this._interaction.user.id;
   }
   
+  public get userIcon(): string {
+    return this._interaction.user.displayAvatarURL();
+  }
+  
   public get intent(): InteractionIntent {
     return InteractionId.getIntent(this._interaction.customId);
   }
