@@ -15,10 +15,11 @@ const describeResultsMessage = "Time's up! The players either supplied their act
 
 enum AdventureState {
   Idle = 'idle',
-  Collecting = 'collecting',
-  Active = 'active',
+  Collecting = 'collecting', // Awaiting reactions to begin the adventure
+  InputStage = 'input-stage', // Awaiting players to provide their input
+  AwaitingOutcome = 'awaiting-outcome',
+  
   PostStage = 'post-stage',
-  InputStage = 'input-stage'
 }
 
 export interface AdventureEvents {
@@ -91,128 +92,148 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._courseDescription = JSON5.parse(courseDescRaw);
     console.log(this._courseDescription);
     this._courseDescription.players = playerArray;
-    
-    setTimeout(this.runAdventure.bind(this), 1000);
+
+    // Kick things off!
+    await this._startMsg.continue({
+      segments: [{ header: this._courseDescription.name, body: `*The adventure begins with the following brave souls: ${this._courseDescription.players.join(', ')}*\n\n` }]
+    });
+    await this.startStage();
   }
   
   public async handlePlayerInput(ctx: ButtonContext) {
     console.log(`User: ${this._players[ctx.userId]} intent: ${ctx.intent}`);
     switch (ctx.intent) {
       case InteractionIntent.Input:
-        if (!(ctx.userId in this._players)) {
-          ctx.reply({
-            ephemeral: true,
-            plainTxt: `You didn't sign up for this adventure. Fear not, just join the next one!`
-          });
-          return;
-        }
-        
-        // Prompt the user for input
-        const modalResult = await ctx.spawnModal();
-        console.log(`User: ${this._players[ctx.userId]} replied with: ${modalResult.input}`);
-
-        // Store input
-        const input = JSON.stringify({
-          player: this._players[ctx.userId],
-          reply: modalResult.input
-        });
-        this._currentStageContext.push({"role":"user","content":input});
-        
-        // Eventually: Handle users adding multiple prior to replying to privacy.
-        this._stagePlayerInput[ctx.userId] = {
-          input: modalResult.input,
-          public: null
-        };
-
-        // Whisper back, ask about privacy
-        modalResult.reply({
-          ephemeral: true,
-          plainTxt: 'Received! Should I let your fellow adventurers know of your intent, or keep them in the dark?',
-          buttons: [
-            {intent: InteractionIntent.Agree, txt: '👍'},
-            {intent: InteractionIntent.Disagree, txt: '👎'}
-          ]
-        });
+        await this.promptPlayerForInput(ctx);
         break;
       case InteractionIntent.Agree:
       case InteractionIntent.Disagree:
-      {
-        this._lastInteraction = ctx;
-        ctx.markResolved();
+        await this.acknowledgePlayerInputPrivacy(ctx);
         
-        // Record intent, and generate echo content.
-        let displayMsg: string;
-        if (ctx.intent === InteractionIntent.Agree) {
-          this._stagePlayerInput[ctx.userId].public = true;
-          displayMsg = this._stagePlayerInput[ctx.userId].input;
-        } else {
-          this._stagePlayerInput[ctx.userId].public = false;
-          displayMsg = `_Did something, but it's a secret_`
-        }
+        // Check if this was the final input resolving
+        if (this.awaitingPlayerInput()) return;
         
-        const msgSegments: OutboundMessage['segments'] = [{
-          user: {
-            name: this._players[ctx.userId],
-            icon: ctx.userIcon
-          },
-          body: displayMsg 
-        }];
-
-        // Augment response if input is still required
-        const missingPlayers = this.awaitingPlayerInput();
-        console.log(`Missing player input still? ${missingPlayers}`);
-        if (missingPlayers) {
-          const missingNames = [];
-          for (const id in this._players) {
-            if (id in this._stagePlayerInput) continue;
-            missingNames.push(this._players[id]);
-          }
-          msgSegments.push({ body: `Still awaiting actions for: ${missingNames.join(', ')}`});
-        }
-
-        // Echo player's input to channel, THEN handle ack.
-        // Use a race incase Discord's API is slow, so we also get the ack outbound before the 3s window closes.
-        await Promise.race([
-          ctx.continue({ segments: msgSegments }),
-          Delay.ms(1000)
-        ]);
+        await Delay.ms(3000);
+        
+        // Prompt the players to continue when they're ready.
+        this._state = AdventureState.AwaitingOutcome;
+        ctx.continue({
+          segments: [{
+            body: 'Everyone has responded. Take your time reading! Continue the adventure when you\'re ready.'
+          }],
+          buttons: [{
+            intent: InteractionIntent.EndStage,
+            txt: 'Onwards!'
+          }]
+        })
         break;
-      }
+      case InteractionIntent.EndStage:
+        // Ignore multiple people clicking continue, or clicking continue at a random time.
+        if (this._state !== AdventureState.AwaitingOutcome) return; 
+        this._state = AdventureState.PostStage;
+
+        this._lastInteraction = ctx;
+        await ctx.markThinking();
+        // ctx.markResolved(`${userMention(ctx.userId)} has continued the adventure!`);
+        
+        await this.endStage();
+        await Delay.ms(POST_STAGE_DURATION);
+        this._currentStage++;
+        
+        if (++this._currentStage < this._courseDescription.stages) 
+        {
+          this.startStage();
+        } 
+        else 
+        {
+          this.endAdventure();
+        }
+        break;
     }
   }
   
-  private async runAdventure() {
-    await this._startMsg.continue({
-      segments: [{ header: this._courseDescription.name, body: `*The adventure begins with the following brave souls: ${this._courseDescription.players.join(', ')}*\n\n` }]
-    });
-    
-    while (this._currentStage < this._courseDescription.stages) {
-      await this.startStage();
-      this._state = AdventureState.InputStage;
-      
-      this.startStageTimer();
-      while (!this._stageTimeElapsed && this.awaitingPlayerInput()) {
-        await Delay.ms(100);
-      }
-      this.cancelStageTimer();
-      
-      if (this._stageTimeElapsed) {
-        this._lastInteraction.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
-      }
-      
-      // Artifical delay to ensure the last player's input is echoed back before anything else.
-      await Delay.ms(250);
-
-      this._state = AdventureState.PostStage;
-      await this.endStage();
-      await Delay.ms(POST_STAGE_DURATION);
-      this._currentStage++;
+  private async promptPlayerForInput(ctx: ButtonContext) {
+    if (!(ctx.userId in this._players)) {
+      ctx.reply({
+        ephemeral: true,
+        plainTxt: `You didn't sign up for this adventure. Fear not, just join the next one!`
+      });
+      return;
     }
-    await this.endAdventure();
+
+    // Prompt the user for input
+    const modalResult = await ctx.spawnModal();
+    console.log(`User: ${this._players[ctx.userId]} replied with: ${modalResult.input}`);
+
+    // Store input
+    const input = JSON.stringify({
+      player: this._players[ctx.userId],
+      reply: modalResult.input
+    });
+    this._currentStageContext.push({"role":"user","content":input});
+
+    // Eventually: Handle users adding multiple prior to replying to privacy.
+    this._stagePlayerInput[ctx.userId] = {
+      input: modalResult.input,
+      public: null
+    };
+
+    // Whisper back, ask about privacy
+    modalResult.reply({
+      ephemeral: true,
+      plainTxt: 'Received! Should I let your fellow adventurers know of your intent, or keep them in the dark?',
+      buttons: [
+        {intent: InteractionIntent.Agree, txt: '👍'},
+        {intent: InteractionIntent.Disagree, txt: '👎'}
+      ]
+    });
+  }
+  
+  private async acknowledgePlayerInputPrivacy(ctx: ButtonContext) {
+    ctx.markResolved({ plainTxt: `You're all set! When everyone has answered, the game will continue.` });
+
+    // Record intent, and generate echo content.
+    let displayMsg: string;
+    if (ctx.intent === InteractionIntent.Agree) {
+      this._stagePlayerInput[ctx.userId].public = true;
+      displayMsg = this._stagePlayerInput[ctx.userId].input;
+    } else {
+      this._stagePlayerInput[ctx.userId].public = false;
+      displayMsg = `_Did something, but it's a secret_`
+    }
+
+    const msgSegments: OutboundMessage['segments'] = [{
+      user: {
+        name: this._players[ctx.userId],
+        icon: ctx.userIcon
+      },
+      body: displayMsg
+    }];
+
+    // Augment response if input is still required
+    const missingPlayers = this.awaitingPlayerInput();
+    console.log(`Missing player input still? ${missingPlayers}`);
+    if (missingPlayers) {
+      const missingNames = [];
+      for (const id in this._players) {
+        if (id in this._stagePlayerInput) continue;
+        missingNames.push(this._players[id]);
+      }
+      msgSegments.push({ body: `Still awaiting actions for: ${missingNames.join(', ')}`});
+    }
+
+    // Echo player's input to channel, THEN handle ack.
+    // Use a race incase Discord's API is slow, so we also get the ack outbound before the 3s window closes.
+    await Promise.race([
+      ctx.continue({ segments: msgSegments }),
+      Delay.ms(1000)
+    ]);
   }
 
   private async startStage() {
     console.log(`\n\n==========Starting stage ${this._currentStage}`);
+    this._state = AdventureState.InputStage;
+    
     //First clear the overall stage chat sequence
     this._currentStageContext = [];
     this._stagePlayerInput = {};
@@ -254,12 +275,13 @@ export class Adventure extends Emitter<AdventureEvents> {
       resultParts[lowestPositionInArr] = resultParts[lowestPositionInArr].replace(playerName, userMention(id));
     }
     
-    this._lastInteraction.followUp({
+    const msg: OutboundMessage = {
       segments: [{
         header: `${this._courseDescription.name} // Stage ${this._currentStage+1} Outcome`,
         body: resultParts.join('\n')
       }]
-    });
+    };
+    this._lastInteraction.markResolved(msg);
     
     this._history = await Services.OpenAI.getStageHistory(this._currentStageContext, this._history);
     console.log(`Received following history response: ${this._history}`);

@@ -1,7 +1,8 @@
 export enum InteractionIntent {
   Input = 'Input',
   Agree = 'Agree',
-  Disagree = 'Disagree'
+  Disagree = 'Disagree',
+  EndStage = 'EndStage'
 }
 
 export module InteractionId {

@@ -67,11 +67,16 @@ export class ButtonContext extends InputContext {
     return new ModalContext(result);
   }
   
-  public markResolved() {
-    this._interaction.update({
-      content: 'You\'re all set! When everyone has answered, the game will continue.',
-      components: []
-    });
+  public markResolved(msg: OutboundMessage) {
+    if (!this._interaction.deferred) {
+      // TODO: Fix this if we're trying to send rich embeds via a resolution.
+      this._interaction.update({
+        content: msg.plainTxt,
+        components: []
+      });
+    } else {
+      this._interaction.editReply(this.buildDiscordMessage(msg));
+    }
   }
   
   public async markThinking() {
