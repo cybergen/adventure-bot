@@ -128,7 +128,13 @@ export class Adventure extends Emitter<AdventureEvents> {
         break;
       case InteractionIntent.Disagree:
         ctx.continue({
-          plainTxt: `${this._players[ctx.userId]} has acted in secret.`
+          segments: [{
+            user: {
+              name: this._players[ctx.userId],
+              icon: ctx.userIcon
+            },
+            body: `_Did something, but it's a secret_`
+          }]
         });
         break;
     }
