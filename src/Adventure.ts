@@ -8,7 +8,7 @@ import { InteractionIntent } from './discord-utils/InteractionId';
 import * as JSON5 from 'json5'
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up! The players should have supplied their actions. Please describe what happens to them in 2 sentences each.";
+const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
 
 enum AdventureState {
   Idle = 'idle',
@@ -31,6 +31,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   //Initial plan for course
   private _courseDescription: {
     players: string[],
+    difficulty: string,
     stages: number,
     name: string
   };
@@ -40,6 +41,9 @@ export class Adventure extends Emitter<AdventureEvents> {
   
   private _currentStage = 0;
   private _stagePlayerInput: Record<string, string> = {}; // Mappings of Id->PlayerInput
+  private _stageRepliedPlayers = [];
+  private _stageTimeElapsed = false;
+  private _stageTimer = null;
   
   public async initialize(msg: MsgContext) {
     const params = msg.content.slice('!adventure'.length).trim();
@@ -90,10 +94,12 @@ export class Adventure extends Emitter<AdventureEvents> {
   }
   
   public async handlePlayerInput(ctx: ButtonContext) {
+    console.log(`User: ${this._players[ctx.userId]} intent: ${ctx.intent}`);
     switch (ctx.intent) {
       case InteractionIntent.Input:
         // Prompt the user for input
         const modalResult = await ctx.spawnModal();
+        console.log(`User: ${this._players[ctx.userId]} replied with: ${modalResult.input}`);
 
         // Store input
         const input = JSON.stringify({
@@ -116,26 +122,54 @@ export class Adventure extends Emitter<AdventureEvents> {
         });
         break;
       case InteractionIntent.Agree:
-        ctx.continue({
-          segments: [{
-            user: {
-              name: this._players[ctx.userId],
-              icon: ctx.userIcon
-            },
-            body: this._stagePlayerInput[ctx.userId]
-          }]
-        });
+        this._stageRepliedPlayers.push(this._players[ctx.userId]);
+        if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+          const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
+          ctx.continue({
+            segments: [{
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
+              body: this._stagePlayerInput[ctx.userId] + `\n\nStill awaiting actions for: ${missingPlayers}`
+            }]
+          });
+        } else {
+          ctx.continue({
+            segments: [{
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
+              body: this._stagePlayerInput[ctx.userId]
+            }]
+          });
+        }
         break;
       case InteractionIntent.Disagree:
-        ctx.continue({
-          segments: [{
-            user: {
-              name: this._players[ctx.userId],
-              icon: ctx.userIcon
-            },
-            body: `_Did something, but it's a secret_`
-          }]
-        });
+        this._stageRepliedPlayers.push(this._players[ctx.userId]);
+        if (!this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+          const missingPlayers = this._courseDescription.players.filter(element => !this._stageRepliedPlayers.includes(element)).join(", ");
+          ctx.continue({
+            segments: [{
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
+              body: `_Did something, but it's a secret_\n\nStill awaiting actions for: ${missingPlayers}`
+            }]
+          });
+        } else {
+          ctx.continue({
+            segments: [{
+              user: {
+                name: this._players[ctx.userId],
+                icon: ctx.userIcon
+              },
+              body: `_Did something, but it's a secret_`
+            }]
+          });
+        }
         break;
     }
   }
@@ -148,9 +182,19 @@ export class Adventure extends Emitter<AdventureEvents> {
     while (this._currentStage < this._courseDescription.stages) {
       await this.startStage();
       this._state = AdventureState.InputStage;
-      await Delay.ms(STAGE_RESPONSE_DURATION);
       
-      await this._startMsg.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
+      this.startStageTimer();
+      while (!this._stageTimeElapsed && !this._courseDescription.players.every(element => this._stageRepliedPlayers.includes(element))) {
+        await Delay.ms(100);
+      }
+      this.cancelStageTimer();
+      
+      if (this._stageTimeElapsed) {
+        this._startMsg.continue({ plainTxt: `__**Time's up! Getting stage results!**__` });
+      } else {
+        this._startMsg.continue({ plainTxt: `__**All actions in! Getting stage results!**__` });
+      }
+
       this._state = AdventureState.PostStage;
       await this.endStage();
       await Delay.ms(POST_STAGE_DURATION);
@@ -164,6 +208,8 @@ export class Adventure extends Emitter<AdventureEvents> {
     //First clear the overall stage chat sequence
     this._currentStageContext = [];
     this._stagePlayerInput = {};
+    this._stageTimeElapsed = false;
+    this._stageRepliedPlayers = [];
     //Then trigger the start of new stage chat completion
     
     const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
@@ -172,7 +218,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         header: `Stage ${this._currentStage+1}`,
         body: result
       }],
-      buttons: [{ txt: 'Add Response', intent: InteractionIntent.Input }]
+      buttons: [{ txt: 'Do Something!', intent: InteractionIntent.Input }]
     });
   }
 
@@ -198,5 +244,18 @@ export class Adventure extends Emitter<AdventureEvents> {
     });
     
     this.emit('concluded');
+  }
+
+  private startStageTimer(): void {
+    this._stageTimer = setTimeout(() => {
+      this._stageTimeElapsed = true;
+    }, STAGE_RESPONSE_DURATION);
+  }
+
+  private cancelStageTimer(): void {
+    if (this._stageTimer) {
+      clearTimeout(this._stageTimer);
+      this._stageTimer = null;
+    }
   }
 }

@@ -51,7 +51,10 @@ export class ButtonContext extends InputContext {
           })),
       ]
     });
+    
     const result = await this._interaction.awaitModalSubmit({
+      // IMPORTANT! Without this filter check, ANY modal submission passes this await, despite the base interaction being different.
+      filter: r => r.user.id === this._interaction.user.id,
       time: 1000 * 60 * 15 // Longer than the stage but whatevs
     });
     
