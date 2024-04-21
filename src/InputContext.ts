@@ -2,13 +2,13 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonInteraction,
-  ButtonStyle,
+  ButtonStyle, ChatInputCommandInteraction,
   ComponentType, EmbedBuilder,
   Message,
   MessageCreateOptions, ModalSubmitInteraction
 } from 'discord.js';
-import { MsgContext } from './MsgContext';
 import { InteractionId, InteractionIntent } from './discord-utils/InteractionId';
+import { MsgContext } from './MsgContext';
 
 export type ButtonConfig = Array<{txt: string, intent: InteractionIntent}>;
 export type TextSegment = { user?: { icon: string, name: string }, header?: string, body: string };
@@ -22,18 +22,18 @@ export type OutboundMessage = Partial<{
 
 export abstract class InputContext {
   
-  protected _base: Message | ButtonInteraction | ModalSubmitInteraction;
+  protected _base: Message | ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction;
   
   public abstract get channelId(): string;
   public abstract get userId(): string;
   public abstract get userIcon(): string;
   
-  protected constructor(base: Message | ButtonInteraction | ModalSubmitInteraction) {
+  protected constructor(base: Message | ChatInputCommandInteraction | ButtonInteraction | ModalSubmitInteraction) {
     this._base = base;
   }
   
   public async reply(msg: OutboundMessage) {
-    // @ts-ignore  TODO: Figure out this type issue
+    // @ts-ignore
     await this._base.reply(this.buildDiscordMessage(msg));
   }
   

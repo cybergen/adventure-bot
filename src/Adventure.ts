@@ -1,11 +1,12 @@
-﻿import { MsgContext } from './MsgContext';
-import { Emitter } from './Emitter';
+﻿import { Emitter } from './Emitter';
 import { JOIN_DURATION, POST_STAGE_DURATION, STAGE_RESPONSE_DURATION } from './Constants';
 import { Services } from './services/Services';
 import { Delay } from './Delay';
 import { ButtonContext } from './ButtonContext';
 import { InteractionIntent } from './discord-utils/InteractionId';
 import * as JSON5 from 'json5'
+import { InvokeContext } from './InvokeContext';
+import { MsgContext } from './MsgContext';
 
 //Some commands for the chat bot
 const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
@@ -45,28 +46,19 @@ export class Adventure extends Emitter<AdventureEvents> {
   private _stageTimeElapsed = false;
   private _stageTimer = null;
   
-  public async initialize(msg: MsgContext) {
-    const params = msg.content.slice('!adventure'.length).trim();
-    if (!params) {
-      msg.reply({
-        plainTxt: 'Please provide a prompt for the adventure including a theme and a duration.'
-      });
-      this.emit('concluded');
-      return;
-    }
-    
+  public async initialize(config: InvokeContext) {
     this._state = AdventureState.Collecting;
-
-    this._startMsg = await msg.continue({
+    
+    this._startMsg = await config.continue({
       segments: [{
         header: 'Adventure Awaits!',
-        body: `*We've got a new adventure starting! React to this message to join the adventure.*`
+        body: `Prompt: ${config.description}\nDifficulty: ${config.difficulty} \n\n*We've got a new adventure starting! React to this message to join the adventure.*`
       }]
     });
     const guild = this._startMsg.guild;
     let userIds = await this._startMsg.getReactions(JOIN_DURATION);
     if (userIds.length === 0) {
-      msg.reply({ plainTxt: `Nobody signed up! Cancelling this adventure, cowards.` });
+      config.reply({ plainTxt: `Nobody signed up! Cancelling this adventure, cowards.` });
       this.emit('concluded');
       return;
     }
@@ -84,8 +76,8 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
     const playerArray = Object.values(this._players);
-    const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(params, playerArray);
-    console.log(courseDescRaw);
+    const prompt = `${config.description} with a ${config.difficulty} difficulty`;
+    const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(prompt, playerArray);
     this._courseDescription = JSON5.parse(courseDescRaw);
     console.log(this._courseDescription);
     this._courseDescription.players = playerArray;

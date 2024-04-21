@@ -63,7 +63,8 @@ export class ButtonContext extends InputContext {
   
   public markResolved() {
     this._interaction.update({
-      content: 'You\'re all set! When everyone has answered, the game will continue.'
+      content: 'You\'re all set! When everyone has answered, the game will continue.',
+      components: []
     });
   }
 }
