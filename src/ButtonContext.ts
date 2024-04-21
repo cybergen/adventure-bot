@@ -14,6 +14,7 @@ import { KEY_INPUT, ModalContext } from './ModalContext';
 export class ButtonContext extends InputContext {
   
   private readonly _interaction: ButtonInteraction;
+  private static _invokeCounters = {}; 
 
   public get channelId(): string {
     return this._interaction.channelId;
@@ -37,6 +38,9 @@ export class ButtonContext extends InputContext {
   }
   
   public async spawnModal(): Promise<ModalContext>   {
+    const userInvokeCount = (ButtonContext._invokeCounters[this.userId] ?? 0) + 1;
+    ButtonContext._invokeCounters[this.userId] = userInvokeCount;
+    
     // TODO: Abstract modal config out so spawnModal is more generic
     await this._interaction.showModal({
       title: 'What would you like to do?',
@@ -54,7 +58,9 @@ export class ButtonContext extends InputContext {
     
     const result = await this._interaction.awaitModalSubmit({
       // IMPORTANT! Without this filter check, ANY modal submission passes this await, despite the base interaction being different.
-      filter: r => r.user.id === this._interaction.user.id,
+      filter: r => 
+        r.user.id === this._interaction.user.id 
+        && ButtonContext._invokeCounters[this.userId] === userInvokeCount,
       time: 1000 * 60 * 15 // Longer than the stage but whatevs
     });
     
