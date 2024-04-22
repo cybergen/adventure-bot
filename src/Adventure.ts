@@ -46,7 +46,6 @@ export class Adventure extends Emitter<AdventureEvents> {
   
   private _currentStage = 0;
   private _stagePlayerInput: Record<string, { input: string, public: boolean }> = {}; // Mappings of Id->PlayerInput
-  private _stageTimeElapsed = false;
   private _stageTimer = null;
   
   public async initialize(config: InvokeContext) {
@@ -138,7 +137,6 @@ export class Adventure extends Emitter<AdventureEvents> {
         
         await this.endStage();
         await Delay.ms(POST_STAGE_DURATION);
-        this._currentStage++;
         
         if (++this._currentStage < this._courseDescription.stages) 
         {
@@ -237,7 +235,6 @@ export class Adventure extends Emitter<AdventureEvents> {
     //First clear the overall stage chat sequence
     this._currentStageContext = [];
     this._stagePlayerInput = {};
-    this._stageTimeElapsed = false;
     //Then trigger the start of new stage chat completion
     
     const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
@@ -298,19 +295,6 @@ export class Adventure extends Emitter<AdventureEvents> {
     this.emit('concluded');
   }
 
-  private startStageTimer(): void {
-    this._stageTimer = setTimeout(() => {
-      this._stageTimeElapsed = true;
-    }, STAGE_RESPONSE_DURATION);
-  }
-
-  private cancelStageTimer(): void {
-    if (this._stageTimer) {
-      clearTimeout(this._stageTimer);
-      this._stageTimer = null;
-    }
-  }
-  
   private awaitingPlayerInput(): boolean {
     // Check for someone who hasn't answered at all.
     const missingInput = Object.keys(this._players).length !== Object.keys(this._stagePlayerInput).length;
