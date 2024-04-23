@@ -39,9 +39,11 @@ export abstract class InputContext {
   
   public async reply(msg: OutboundMessage) {
     // @ts-ignore
-    await this._base.reply(this.buildDiscordMessage(msg));
+    const reply = await this._base.reply(this.buildDiscordMessage(msg));
+    if (reply) return new MsgContext(reply);
   }
   
+  // Sends a new message in the context's channel, outside of any reply/followup flow. 
   public async continue(msg: OutboundMessage): Promise<MsgContext> {
     const sentMsg = await this._base.channel.send(this.buildDiscordMessage(msg));
     return new MsgContext(sentMsg);

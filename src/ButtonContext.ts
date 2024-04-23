@@ -88,8 +88,8 @@ export class ButtonContext extends InputContext {
     await this._interaction.deferReply();
   }
   
-  public followUp(msg: OutboundMessage) {
-    this._interaction.followUp({
+  public async followUp(msg: OutboundMessage) {
+    await this._interaction.followUp({
       ...this.buildDiscordMessage(msg),
       allowedMentions: {
         repliedUser: false

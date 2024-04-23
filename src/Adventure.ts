@@ -45,7 +45,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   private _currentStageContext = [];
   
   private _currentStage = 0;
-  private _stagePlayerInput: Record<string, { input: string, public: boolean }> = {}; // Mappings of Id->PlayerInput
+  private _stagePlayerInput: Record<string, { input: string, echoMessage: MsgContext }> = {}; // Mappings of Id->PlayerInput
   private _stageTimer = null;
   
   public async initialize(config: InvokeContext) {
@@ -107,7 +107,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         break;
       case InteractionIntent.Agree:
       case InteractionIntent.Disagree:
-        await this.acknowledgePlayerInputPrivacy(ctx);
+        // await this.acknowledgePlayerInputPrivacy(ctx);
         
         // Check if this was the final input resolving
         if (this.awaitingPlayerInput()) return;
@@ -171,63 +171,112 @@ export class Adventure extends Emitter<AdventureEvents> {
     });
     this._currentStageContext.push({"role":"user","content":input});
 
+    // Respond immediately to the channel with the submission.
+    const reply = await modalResult.reply({
+      segments: [{
+        user: {
+          name: this._players[ctx.userId],
+          icon: ctx.userIcon
+        },
+        body: modalResult.input
+      }]
+    });
+    
     // Eventually: Handle users adding multiple prior to replying to privacy.
     this._stagePlayerInput[ctx.userId] = {
       input: modalResult.input,
-      public: null
+      echoMessage: reply
+      // public: null
     };
-
+    
     // Whisper back, ask about privacy
-    modalResult.reply({
-      ephemeral: true,
-      plainTxt: 'Received! Should I let your fellow adventurers know of your intent, or keep them in the dark?',
-      buttons: [
-        {intent: InteractionIntent.Agree, txt: '👍'},
-        {intent: InteractionIntent.Disagree, txt: '👎'}
-      ]
+    // modalResult.reply({
+    //   ephemeral: true,
+    //   plainTxt: 'Received! Should I let your fellow adventurers know of your intent, or keep them in the dark?',
+    //   buttons: [
+    //     {intent: InteractionIntent.Agree, txt: '👍'},
+    //     {intent: InteractionIntent.Disagree, txt: '👎'}
+    //   ]
+    // });
+    
+    if (this.awaitingPlayerInput()) return;
+    // All done? Wooo, let everyone know it's time to vote
+    await Delay.ms(1000);
+    ctx.continue({
+      segments: [{
+        header: 'Voting Time',
+        body: 'All players have submitted a response!\n\nTalk it over and vote for the best strategy by adding a reaction to it.\n\nThe game continues in 3 minutes.'
+      }]
     });
+    // TODO: Scale this based on user count? Use a button?
+    setTimeout(this.scoreInputVoting.bind(this), 3 * 60 * 1000);
   }
   
-  private async acknowledgePlayerInputPrivacy(ctx: ButtonContext) {
-    ctx.markResolved({ plainTxt: `You're all set! When everyone has answered, the game will continue.` });
-
-    // Record intent, and generate echo content.
-    let displayMsg: string;
-    if (ctx.intent === InteractionIntent.Agree) {
-      this._stagePlayerInput[ctx.userId].public = true;
-      displayMsg = this._stagePlayerInput[ctx.userId].input;
-    } else {
-      this._stagePlayerInput[ctx.userId].public = false;
-      displayMsg = `_Did something, but it's a secret_`
+  private async scoreInputVoting() {
+    let highestCount = 0;
+    let highestMsgs: MsgContext[] = [];
+    
+    // Intentionally do not count
+    for (const id in this._stagePlayerInput) {
+      const playerInput = this._stagePlayerInput[id];
+      const reactingUsers = playerInput.echoMessage.countUsersWhoReacted();
+      if (reactingUsers < highestCount) continue;
+      
+      // If a new high is found, clear any priors
+      if (reactingUsers > highestCount) {
+        highestCount = reactingUsers;
+        highestMsgs.length = 0;
+      }  
+      
+      // Store the msg(s) with the highest reaction count.
+      highestMsgs.push(playerInput.echoMessage);
     }
-
-    const msgSegments: OutboundMessage['segments'] = [{
-      user: {
-        name: this._players[ctx.userId],
-        icon: ctx.userIcon
-      },
-      body: displayMsg
-    }];
-
-    // Augment response if input is still required
-    const missingPlayers = this.awaitingPlayerInput();
-    console.log(`Missing player input still? ${missingPlayers}`);
-    if (missingPlayers) {
-      const missingNames = [];
-      for (const id in this._players) {
-        if (id in this._stagePlayerInput) continue;
-        missingNames.push(this._players[id]);
-      }
-      msgSegments.push({ body: `Still awaiting actions for: ${missingNames.join(', ')}`});
-    }
-
-    // Echo player's input to channel, THEN handle ack.
-    // Use a race incase Discord's API is slow, so we also get the ack outbound before the 3s window closes.
-    await Promise.race([
-      ctx.continue({ segments: msgSegments }),
-      Delay.ms(1000)
-    ]);
+    
+    const rngHighest = highestMsgs[Math.floor(Math.random() * highestMsgs.length)];
+    this.endStage(rngHighest);
   }
+  
+  // Unused in voting flow
+  // private async acknowledgePlayerInputPrivacy(ctx: ButtonContext) {
+  //   ctx.markResolved({ plainTxt: `You're all set! When everyone has answered, the game will continue.` });
+  //
+  //   // Record intent, and generate echo content.
+  //   let displayMsg: string;
+  //   if (ctx.intent === InteractionIntent.Agree) {
+  //     this._stagePlayerInput[ctx.userId].public = true;
+  //     displayMsg = this._stagePlayerInput[ctx.userId].input;
+  //   } else {
+  //     this._stagePlayerInput[ctx.userId].public = false;
+  //     displayMsg = `_Did something, but it's a secret_`
+  //   }
+  //
+  //   const msgSegments: OutboundMessage['segments'] = [{
+  //     user: {
+  //       name: this._players[ctx.userId],
+  //       icon: ctx.userIcon
+  //     },
+  //     body: displayMsg
+  //   }];
+  //
+  //   // Augment response if input is still required
+  //   const missingPlayers = this.awaitingPlayerInput();
+  //   console.log(`Missing player input still? ${missingPlayers}`);
+  //   if (missingPlayers) {
+  //     const missingNames = [];
+  //     for (const id in this._players) {
+  //       if (id in this._stagePlayerInput) continue;
+  //       missingNames.push(this._players[id]);
+  //     }
+  //     msgSegments.push({ body: `Still awaiting actions for: ${missingNames.join(', ')}`});
+  //   }
+  //
+  //   // Echo player's input to channel, THEN handle ack.
+  //   // Use a race incase Discord's API is slow, so we also get the ack outbound before the 3s window closes.
+  //   await Promise.race([
+  //     ctx.followUp({ segments: msgSegments }),
+  //     Delay.ms(1000)
+  //   ]);
+  // }
 
   private async startStage() {
     console.log(`\n\n==========Starting stage ${this._currentStage}`);
@@ -248,7 +297,8 @@ export class Adventure extends Emitter<AdventureEvents> {
     });
   }
 
-  private async endStage() {
+  private async endStage(votedScenario: MsgContext) {
+    // TODO Brian: Do something with votedScenario.content
     const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
     
     const resultParts = result.split('\n');
@@ -302,9 +352,9 @@ export class Adventure extends Emitter<AdventureEvents> {
     if (missingInput) return true;
     
     // Check for someone pending the visibility prompt.
-    for (const id in this._stagePlayerInput) {
-      if (typeof this._stagePlayerInput[id].public !== 'boolean') return true;
-    }
+    // for (const id in this._stagePlayerInput) {
+    //   if (typeof this._stagePlayerInput[id].public !== 'boolean') return true;
+    // }
     
     return false;
   }

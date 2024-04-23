@@ -46,4 +46,16 @@ export class MsgContext extends InputContext {
     
     return users;
   }
+  
+  // Returns the total number of users who reacted at least once.
+  public countUsersWhoReacted(): number {
+    const users = [];
+    this._message.reactions.cache.forEach(r => {
+      r.users.cache.forEach(u => {
+        if (users.includes(u.id)) return;
+        users.push(u.id);
+      });
+    });
+    return users.length;
+  }
 }
