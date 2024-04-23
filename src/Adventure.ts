@@ -105,48 +105,48 @@ export class Adventure extends Emitter<AdventureEvents> {
       case InteractionIntent.Input:
         await this.promptPlayerForInput(ctx);
         break;
-      case InteractionIntent.Agree:
-      case InteractionIntent.Disagree:
-        // await this.acknowledgePlayerInputPrivacy(ctx);
-        
-        // Check if this was the final input resolving
-        if (this.awaitingPlayerInput()) return;
-        
-        await Delay.ms(3000);
-        
-        // Prompt the players to continue when they're ready.
-        this._state = AdventureState.AwaitingOutcome;
-        ctx.continue({
-          segments: [{
-            body: 'Everyone has responded. Take your time reading! Continue the adventure when you\'re ready.'
-          }],
-          buttons: [{
-            intent: InteractionIntent.EndStage,
-            txt: 'Onwards!'
-          }]
-        })
-        break;
-      case InteractionIntent.EndStage:
-        // Ignore multiple people clicking continue, or clicking continue at a random time.
-        if (this._state !== AdventureState.AwaitingOutcome) return; 
-        this._state = AdventureState.PostStage;
-
-        this._lastInteraction = ctx;
-        await ctx.markThinking();
-        // ctx.markResolved(`${userMention(ctx.userId)} has continued the adventure!`);
-        
-        await this.endStage();
-        await Delay.ms(POST_STAGE_DURATION);
-        
-        if (++this._currentStage < this._courseDescription.stages) 
-        {
-          this.startStage();
-        } 
-        else 
-        {
-          this.endAdventure();
-        }
-        break;
+      // case InteractionIntent.Agree:
+      // case InteractionIntent.Disagree:
+      //   // await this.acknowledgePlayerInputPrivacy(ctx);
+      //  
+      //   // Check if this was the final input resolving
+      //   if (this.awaitingPlayerInput()) return;
+      //  
+      //   await Delay.ms(3000);
+      //  
+      //   // Prompt the players to continue when they're ready.
+      //   this._state = AdventureState.AwaitingOutcome;
+      //   ctx.continue({
+      //     segments: [{
+      //       body: 'Everyone has responded. Take your time reading! Continue the adventure when you\'re ready.'
+      //     }],
+      //     buttons: [{
+      //       intent: InteractionIntent.EndStage,
+      //       txt: 'Onwards!'
+      //     }]
+      //   })
+      //   break;
+      // case InteractionIntent.EndStage:
+      //   // Ignore multiple people clicking continue, or clicking continue at a random time.
+      //   if (this._state !== AdventureState.AwaitingOutcome) return; 
+      //   this._state = AdventureState.PostStage;
+      //
+      //   this._lastInteraction = ctx;
+      //   await ctx.markThinking();
+      //   // ctx.markResolved(`${userMention(ctx.userId)} has continued the adventure!`);
+      //  
+      //   await this.endStage();
+      //   await Delay.ms(POST_STAGE_DURATION);
+      //  
+      //   if (++this._currentStage < this._courseDescription.stages) 
+      //   {
+      //     this.startStage();
+      //   } 
+      //   else 
+      //   {
+      //     this.endAdventure();
+      //   }
+      //   break;
     }
   }
   
@@ -233,7 +233,19 @@ export class Adventure extends Emitter<AdventureEvents> {
     }
     
     const rngHighest = highestMsgs[Math.floor(Math.random() * highestMsgs.length)];
-    this.endStage(rngHighest);
+    
+    
+    await this.endStage(rngHighest);
+    await Delay.ms(POST_STAGE_DURATION);
+
+    if (++this._currentStage < this._courseDescription.stages)
+    {
+      this.startStage();
+    }
+    else
+    {
+      this.endAdventure();
+    }
   }
   
   // Unused in voting flow
