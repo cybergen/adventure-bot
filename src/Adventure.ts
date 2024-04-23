@@ -161,6 +161,7 @@ export class Adventure extends Emitter<AdventureEvents> {
 
     // Prompt the user for input
     const modalResult = await ctx.spawnModal();
+    if (!modalResult) return;
     console.log(`User: ${this._players[ctx.userId]} replied with: ${modalResult.input}`);
 
     // Store input

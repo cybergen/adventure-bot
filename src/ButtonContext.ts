@@ -56,15 +56,20 @@ export class ButtonContext extends InputContext {
       ]
     });
     
-    const result = await this._interaction.awaitModalSubmit({
-      // IMPORTANT! Without this filter check, ANY modal submission passes this await, despite the base interaction being different.
-      filter: r => 
-        r.user.id === this._interaction.user.id 
-        && ButtonContext._invokeCounters[this.userId] === userInvokeCount,
-      time: 1000 * 60 * 15 // Longer than the stage but whatevs
-    });
-    
-    return new ModalContext(result);
+    try {
+      const result = await this._interaction.awaitModalSubmit({
+        // IMPORTANT! Without this filter check, ANY modal submission passes this await, despite the base interaction being different.
+        filter: r =>
+          r.user.id === this._interaction.user.id
+          && ButtonContext._invokeCounters[this.userId] === userInvokeCount,
+        time: 1000 * 60 * 15 // Longer than the stage but whatevs
+      });
+
+      return new ModalContext(result);
+    } catch (err) {
+      // Throws an error if a modal is opened/closed with no input.
+      return null; 
+    }
   }
   
   public markResolved(msg: OutboundMessage) {
