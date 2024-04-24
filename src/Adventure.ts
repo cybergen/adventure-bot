@@ -1,5 +1,6 @@
 ﻿import { Emitter } from './Emitter';
 import { JOIN_DURATION, POST_STAGE_DURATION, STAGE_RESPONSE_DURATION } from './Constants';
+import { describeResultsMessage as DESCRIBE_RESULTS } from './services/OpenAIService';
 import { Services } from './services/Services';
 import { Delay } from './Delay';
 import { ButtonContext } from './ButtonContext';
@@ -9,9 +10,6 @@ import { InvokeContext } from './InvokeContext';
 import { MsgContext } from './MsgContext';
 import { OutboundMessage } from './InputContext';
 import { userMention } from 'discord.js';
-
-//Some commands for the chat bot
-const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty. Also, be 100% sure to honor the players' prior state and reject nonviable actions where applicable.";
 
 enum AdventureState {
   Idle = 'idle',
@@ -249,7 +247,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   }
 
   private async endStage() {
-    const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
+    const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content": DESCRIBE_RESULTS});
     
     const resultParts = result.split('\n');
     // This is disgusting, but let's fucking go.
