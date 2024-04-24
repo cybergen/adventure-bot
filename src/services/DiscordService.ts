@@ -3,7 +3,7 @@
   Client, ComponentType,
   Events,
   GatewayIntentBits,
-  Interaction, TextInputBuilder, TextInputStyle
+  Interaction, Message, ReactionEmoji, TextInputBuilder, TextInputStyle, User
 } from 'discord.js';
 import { Emitter } from '../Emitter';
 import { ButtonContext } from '../ButtonContext';
@@ -34,7 +34,7 @@ export class DiscordService extends Emitter<DiscordEvents> {
 
     this._client.login(process.env.DISCORD_API_KEY);
   }
-
+  
   private async OnInteraction(interaction: Interaction) {
     if (interaction.isButton()) {
       this.emit('btnClick', new ButtonContext(interaction));

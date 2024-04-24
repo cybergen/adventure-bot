@@ -15,7 +15,7 @@ export type TextSegment = {
   user?: { icon: string, name: string, footer?: boolean }, 
   header?: string, 
   body: string,
-  meta?: Array<{name: string, value: string, short: boolean}>
+  meta?: Array<{name: string, value: string | number, short: boolean}>
 };
 
 export type OutboundMessage = Partial<{
@@ -104,7 +104,7 @@ export abstract class InputContext {
         for (const entry of e.meta) {
           embed.addFields({
             name: entry.name,
-            value: entry.value,
+            value: `${entry.value}`,
             inline: entry.short
           });
         }

@@ -66,7 +66,11 @@ export class Adventure extends Emitter<AdventureEvents> {
       }]
     });
     const guild = this._startMsg.guild;
-    let userIds = await this._startMsg.getReactions(JOIN_DURATION);
+    this._startMsg.startReactionCollection();
+    await Delay.ms(JOIN_DURATION);
+    
+    let userIds = this._startMsg.stopReactionCollection();
+    
     if (userIds.length === 0) {
       config.reply({ plainTxt: `Nobody signed up! Cancelling this adventure, cowards.` });
       this.emit('concluded');
@@ -88,13 +92,15 @@ export class Adventure extends Emitter<AdventureEvents> {
     const playerArray = Object.values(this._players);
     const prompt = `${config.description} with a ${config.difficulty} difficulty`;
     const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(prompt, playerArray);
-    this._courseDescription = JSON5.parse(courseDescRaw);
+    this._courseDescription = JSON5.parse(courseDescRaw.response);
     console.log(this._courseDescription);
     this._courseDescription.players = playerArray;
 
     // Kick things off!
     await this._startMsg.continue({
-      segments: [{ header: this._courseDescription.name, body: `*The adventure begins with the following brave souls: ${this._courseDescription.players.join(', ')}*\n\n` }]
+      segments: [
+        { header: this._courseDescription.name, body: `*The adventure begins with the following brave souls: ${this._courseDescription.players.join(', ')}*\n\n` }
+      ]
     });
     await this.startStage();
   }
@@ -172,7 +178,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._currentStageContext.push({"role":"user","content":input});
 
     // Respond immediately to the channel with the submission.
-    const reply = await modalResult.reply({
+    const reply = await modalResult.continue({
       segments: [{
         user: {
           name: this._players[ctx.userId],
@@ -181,6 +187,7 @@ export class Adventure extends Emitter<AdventureEvents> {
         body: modalResult.input
       }]
     });
+    reply.startReactionCollection();
     
     // Eventually: Handle users adding multiple prior to replying to privacy.
     this._stagePlayerInput[ctx.userId] = {
@@ -200,16 +207,18 @@ export class Adventure extends Emitter<AdventureEvents> {
     // });
     
     if (this.awaitingPlayerInput()) return;
+    
+    const voteTime = 2;
     // All done? Wooo, let everyone know it's time to vote
     await Delay.ms(1000);
     ctx.continue({
       segments: [{
         header: 'Voting Time',
-        body: 'All players have submitted a response!\n\nTalk it over and vote for the best strategy by adding a reaction to it.\n\nThe game continues in 3 minutes.'
+        body: `All players have submitted a response!\n\nTalk it over and vote for the best strategy by adding a reaction to it.\n\nThe game continues in ${voteTime} minutes.`
       }]
     });
     // TODO: Scale this based on user count? Use a button?
-    setTimeout(this.scoreInputVoting.bind(this), 3 * 60 * 1000);
+    setTimeout(this.scoreInputVoting.bind(this), voteTime * 60 * 1000);
   }
   
   private async scoreInputVoting() {
@@ -219,7 +228,8 @@ export class Adventure extends Emitter<AdventureEvents> {
     // Intentionally do not count
     for (const id in this._stagePlayerInput) {
       const playerInput = this._stagePlayerInput[id];
-      const reactingUsers = playerInput.echoMessage.countUsersWhoReacted();
+      const reactingUsers = playerInput.echoMessage.stopReactionCollection().length;
+      console.log(`${this._players[id]} has ${reactingUsers} reactions`);
       if (reactingUsers < highestCount) continue;
       
       // If a new high is found, clear any priors
@@ -303,7 +313,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     await this._startMsg.continue({
       segments: [{
         header: `${this._courseDescription.name} // Stage ${this._currentStage+1}`,
-        body: result
+        body: result.response
       }],
       buttons: [{ txt: 'Do Something!', intent: InteractionIntent.Input }]
     });
@@ -313,7 +323,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     // TODO Brian: Do something with votedScenario.content
     const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
     
-    const resultParts = result.split('\n');
+    const resultParts = result.response.split('\n');
     // This is disgusting, but let's fucking go.
     // Maybe change the LLM to respond with users in a [<name>] type of keyed format to handle edge cases with someone's displayName trolling (ex: the)
     for (const id in this._players) {
@@ -334,6 +344,10 @@ export class Adventure extends Emitter<AdventureEvents> {
       // Intentionally replace only the first occurence of their name?
       resultParts[lowestPositionInArr] = resultParts[lowestPositionInArr].replace(playerName, userMention(id));
     }
+
+    const historyResult = await Services.OpenAI.getStageHistory(this._currentStageContext, this._history);
+    this._history = historyResult.response;
+    console.log(`Received following history response: ${this._history}`);
     
     const msg: OutboundMessage = {
       segments: [{
@@ -342,16 +356,14 @@ export class Adventure extends Emitter<AdventureEvents> {
       }]
     };
     this._lastInteraction.markResolved(msg);
-    
-    this._history = await Services.OpenAI.getStageHistory(this._currentStageContext, this._history);
-    console.log(`Received following history response: ${this._history}`);
   }
 
   private async endAdventure() {
+    const result = await Services.OpenAI.getAdventureResults(this._courseDescription, this._history);
     this._startMsg.continue({
       segments: [{
         header: `${this._courseDescription.name} // Adventure Outcome`,
-        body: await Services.OpenAI.getAdventureResults(this._courseDescription, this._history)
+        body: result.response,
       }]
     });
     

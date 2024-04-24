@@ -9,49 +9,51 @@ const stageChatTokens = 512;
 const resultSummarizerModel = "gpt-4-turbo-preview";
 const resultSummarizerTokens = 832;
 
+export type GptOutput = { response: string, stats: { inputTokens: number, outputTokens: number }};
+
 export class OpenAIService {
 
   private readonly _openai = new OpenAI();
   
-  public async getLLMCourseDescription(prompt, players) {
+  public async getLLMCourseDescription(prompt, players): Promise<GptOutput> {
     const fullPrompt = prompt + ". The players are " + players.join(', ');
     return await this.fetchOpenAIResponseSingleShot(courseDescriptionSystemPrompt, fullPrompt, courseDescriptionModel, courseDescriptionTokens);
   }
 
   //Starts a chat completion sequence
-  public async getLLMStageDescription(courseContext: object[], courseDescription, history: string): Promise<string> {
+  public async getLLMStageDescription(courseContext: object[], courseDescription, history: string): Promise<GptOutput> {
     courseContext.push({"role":"system","content":stageSystemPrompt});
 
     let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\n" + history;
     return await this.appendToStageChatAndReturnLLMResponse(courseContext, {"role":"user","content":fullPrompt});
   }
 
-  public async getStageHistory(stageContext: object[], history: string) {
+  public async getStageHistory(stageContext: object[], history: string): Promise<GptOutput> {
     let fullPrompt = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc), in the following format:\n\n" + history;
     return await this.appendToStageChatAndReturnLLMResponse(stageContext, {"role":"user","content":fullPrompt});
   }
 
-  public async getAdventureResults(courseDescription, history: string) {
+  public async getAdventureResults(courseDescription, history: string): Promise<GptOutput> {
     let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\n" + history;
     return await this.fetchOpenAIResponseSingleShot(resultSummarizerSystemPrompt, fullPrompt, resultSummarizerModel, resultSummarizerTokens)
   }
 
   //Continues a chat completion sequence
-  public async appendToStageChatAndReturnLLMResponse(stageContext: object[], userMessageObject: object): Promise<string> {
+  public async appendToStageChatAndReturnLLMResponse(stageContext: object[], userMessageObject: object): Promise<{ response: string, stats: { inputTokens: number, outputTokens: number }}> {
     //First append latest action
     stageContext.push(userMessageObject)
 
     //Then get openAI response to overall chat
-    const response = await this.fetchOpenAIChatResponse(stageContext, stageChatModel, stageChatTokens);
+    const output = await this.fetchOpenAIChatResponse(stageContext, stageChatModel, stageChatTokens);
 
     //Append openAI response to overall chat message set
-    stageContext.push({"role":"assistant","content":response});
+    stageContext.push({"role":"assistant","content":output.response});
 
     //Return the response now
-    return response;
+    return output;
   }
 
-  private async fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens) {
+  private async fetchOpenAIResponseSingleShot(systemPrompt, prompt, model, tokens): Promise<GptOutput> {
     console.log(`\n\n===================SINGLE SHOT NEW MESSAGE INPUT\n\n${prompt}\n`);
     try {
       const completion = await this._openai.chat.completions.create({
@@ -61,14 +63,20 @@ export class OpenAIService {
         max_tokens: tokens
       });
       console.log(`\n\n=================SINGLE SHOT RESPONSE: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
-      return completion.choices[0].message.content;
+      return {
+        response: completion.choices[0].message.content,
+        stats: {
+          inputTokens: completion.usage.prompt_tokens,
+          outputTokens: completion.usage.completion_tokens
+        }
+      }
     } catch (error) {
       console.error("Error querying OpenAI:", error);
       return null;
     }
   }
 
-  private async fetchOpenAIChatResponse(messageHistory, model, tokens) {
+  private async fetchOpenAIChatResponse(messageHistory, model, tokens): Promise<GptOutput> {
     console.log(`\n\n===================CHAT NEW MESSAGE INPUT\n\n${JSON.stringify(messageHistory)}\n`);
     try {
       const completion = await this._openai.chat.completions.create({
@@ -77,7 +85,13 @@ export class OpenAIService {
         max_tokens: tokens
       });
       console.log(`\n\n=================CHAT RESPONSE: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
-      return completion.choices[0].message.content;
+      return {
+        response: completion.choices[0].message.content,
+        stats: {
+          inputTokens: completion.usage.prompt_tokens,
+          outputTokens: completion.usage.completion_tokens
+        }
+      }
     } catch (error) {
       console.error("Error querying OpenAI:", error);
       return null;

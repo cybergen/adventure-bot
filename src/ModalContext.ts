@@ -1,5 +1,6 @@
-import { InputContext } from './InputContext';
+import { InputContext, OutboundMessage } from './InputContext';
 import { ModalSubmitInteraction } from 'discord.js';
+import { MsgContext } from './MsgContext';
 
 export const KEY_INPUT = 'input';
 
@@ -26,5 +27,10 @@ export class ModalContext extends InputContext {
   public constructor(modal: ModalSubmitInteraction) {
     super(modal);
     this._modal = modal;
+  }
+  
+  public override continue(msg: OutboundMessage): Promise<MsgContext> {
+    this._modal.deferUpdate();
+    return super.continue(msg);
   }
 }
