@@ -11,7 +11,7 @@ import { OutboundMessage } from './InputContext';
 import { userMention } from 'discord.js';
 
 //Some commands for the chat bot
-const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
+const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty. Also, be 100% sure to honor the players' prior state and reject nonviable actions where applicable.";
 
 enum AdventureState {
   Idle = 'idle',
@@ -87,7 +87,7 @@ export class Adventure extends Emitter<AdventureEvents> {
 
     const playerArray = Object.values(this._players);
     const prompt = `${config.description} with a ${config.difficulty} difficulty`;
-    const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(prompt, playerArray);
+    const courseDescRaw = await Services.OpenAI.getCourseDescription(prompt, playerArray);
     this._courseDescription = JSON5.parse(courseDescRaw);
     console.log(this._courseDescription);
     this._courseDescription.players = playerArray;
@@ -238,7 +238,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._stagePlayerInput = {};
     //Then trigger the start of new stage chat completion
     
-    const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
+    const result = await Services.OpenAI.getStageDescription(this._currentStageContext, this._courseDescription, this._history);
     await this._startMsg.continue({
       segments: [{
         header: `${this._courseDescription.name} // Stage ${this._currentStage+1}`,

@@ -13,13 +13,13 @@ export class OpenAIService {
 
   private readonly _openai = new OpenAI();
   
-  public async getLLMCourseDescription(prompt, players) {
+  public async getCourseDescription(prompt, players) {
     const fullPrompt = prompt + ". The players are " + players.join(', ');
     return await this.fetchOpenAIResponseSingleShot(courseDescriptionSystemPrompt, fullPrompt, courseDescriptionModel, courseDescriptionTokens);
   }
 
   //Starts a chat completion sequence
-  public async getLLMStageDescription(courseContext: object[], courseDescription, history: string): Promise<string> {
+  public async getStageDescription(courseContext: object[], courseDescription, history: string): Promise<string> {
     courseContext.push({"role":"system","content":stageSystemPrompt});
 
     let fullPrompt = "Course Description:\n" + JSON.stringify(courseDescription) + "\n\n" + history;
@@ -27,7 +27,7 @@ export class OpenAIService {
   }
 
   public async getStageHistory(stageContext: object[], history: string) {
-    let fullPrompt = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc), in the following format:\n\n" + history;
+    let fullPrompt = historyUpdatePredicate + history;
     return await this.appendToStageChatAndReturnLLMResponse(stageContext, {"role":"user","content":fullPrompt});
   }
 
@@ -91,6 +91,8 @@ Prompt strings
 
 */
 
+const historyUpdatePredicate = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc), in the following format:\n\n";
+
 const courseDescriptionSystemPrompt = `
 You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, a difficulty, and a theme prompt. Your outputted data structure should look like so:
 
@@ -114,7 +116,7 @@ Assume that each stage takes around 2 minutes, and set a stage count based on th
 `;
 
 const stageSystemPrompt = `
-You are a pithy and sarcastic discord bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on difficulty level of the course and how they respond. The challenge is a single stage in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage. You will handle that (and any attempts to further interact) according to whatever is most entertaining/thematically consistent.
+You are a sarcastic discord bot that invents and presents a text-based challenge to a set of players (represented by user id's) and determines an outcome based on difficulty level of the course and how they respond. The challenge is a single stage in a larger course. You take as input an overarching theme as well as a set of context info for the current state of the overall course and the players. For instance, some of the players may have already died on a previous stage. You are great at recognizing when a player should be dead, indisposed, or transferred elsewhere and are perfectly consistent about where they should/can be in your stage setup and you do not hesitate to reject their actions if they run counter to the current player state (eg: a player that has died on a prior stage attempts to jump over a log - REJECTION).
 
 Your initial input will look like so:
 
