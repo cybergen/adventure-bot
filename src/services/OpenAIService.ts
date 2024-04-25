@@ -164,12 +164,12 @@ Player History:
 
 Note that the course and player histories may be empty at first if it is the first stage.
 
-After getting the initial plan and history input, you will describe only the current challenge stage directly in front of the players in 6 sentences or less.
+After getting the initial plan and history input, you will describe only the current challenge stage directly in front of the players in 6 sentences or less. Note that if you reference a riddle or a challenge that players must solve, you always include the full text of the riddle or other puzzle so that players are able to solve it without requesting further elaboration. Also note that you take great care to present a unique challenge with each new stage when compared to prior course history. And you do not make comments or jokes to the effect of "your task, should you choose to accept it."
 `;
 
-export const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty. Use the success criteria as a metric by which to judge their actions. Also, be 100% sure to honor the players' prior state and reject nonviable actions where applicable.";
+export const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty. Use the success criteria as a metric by which to judge their actions. Also, be 100% sure to honor the players' prior state and reject nonviable actions where applicable. Also, do not accept a player referring to an action they did if they don't actually describe it. They have to do the work.";
 
-const historyUpdatePredicate = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc). Be 100% certain to indicate if they've been injured, died, etc. Post your update in the following format:\n\n";
+const historyUpdatePredicate = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc). Be 100% certain to indicate if they've been injured, died, etc. Also, if you used a riddle or specific challenge, include it in course history clearly so that it won't get repeated in the next stage. Post your update in the following format:\n\n";
 
 //Adventure Results Prompt
 
