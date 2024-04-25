@@ -1,5 +1,6 @@
 ﻿import { Emitter } from './Emitter';
 import { JOIN_DURATION, POST_STAGE_DURATION, STAGE_RESPONSE_DURATION } from './Constants';
+import { describeResultsMessage as DESCRIBE_RESULTS } from './services/OpenAIService';
 import { Services } from './services/Services';
 import { Delay } from './Delay';
 import { ButtonContext } from './ButtonContext';
@@ -10,13 +11,10 @@ import { MsgContext } from './MsgContext';
 import { OutboundMessage } from './InputContext';
 import { userMention } from 'discord.js';
 
-//Some commands for the chat bot
-const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
-
 enum AdventureState {
   Idle = 'idle',
   Collecting = 'collecting', // Awaiting reactions to begin the adventure
-  InputStage = 'input-stage', // Awaiting players to provide their input
+  StageInput = 'stage-input', // Awaiting players to provide their input
   AwaitingOutcome = 'awaiting-outcome',
   
   PostStage = 'post-stage',
@@ -37,6 +35,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   private _courseDescription: {
     players: string[],
     difficulty: string,
+    successCriteria: string,
     stages: number,
     name: string
   };
@@ -60,7 +59,9 @@ export class Adventure extends Emitter<AdventureEvents> {
         header: 'Adventure Awaits!',
         meta: [
           { name: 'Prompt', value: config.description, short: false },
-          { name: 'Difficulty', value: config.difficulty, short: true }
+          { name: 'Difficulty', value: config.difficulty, short: true },
+          { name: 'Success Criteria', value: config.successCriteria, short: true },
+          { name: 'Duration', value: config.duration, short: true },
         ],
         body: `*We've got a new adventure starting! React to this message to join the adventure.*`
       }]
@@ -86,8 +87,8 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
     const playerArray = Object.values(this._players);
-    const prompt = `${config.description} with a ${config.difficulty} difficulty`;
-    const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(prompt, playerArray);
+    const prompt = `${config.description} with ${config.difficulty} difficulty, ${config.successCriteria} for success criteria, and duration of ${config.duration} minutes`;
+    const courseDescRaw = await Services.OpenAI.getCourseDescription(prompt, playerArray);
     this._courseDescription = JSON5.parse(courseDescRaw);
     console.log(this._courseDescription);
     this._courseDescription.players = playerArray;
@@ -231,14 +232,14 @@ export class Adventure extends Emitter<AdventureEvents> {
 
   private async startStage() {
     console.log(`\n\n==========Starting stage ${this._currentStage}`);
-    this._state = AdventureState.InputStage;
+    this._state = AdventureState.StageInput;
     
     //First clear the overall stage chat sequence
     this._currentStageContext = [];
     this._stagePlayerInput = {};
     //Then trigger the start of new stage chat completion
     
-    const result = await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
+    const result = await Services.OpenAI.getStageDescription(this._currentStageContext, this._courseDescription, this._history);
     await this._startMsg.continue({
       segments: [{
         header: `${this._courseDescription.name} // Stage ${this._currentStage+1}`,
@@ -249,7 +250,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   }
 
   private async endStage() {
-    const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content":describeResultsMessage});
+    const result = await Services.OpenAI.appendToStageChatAndReturnLLMResponse(this._currentStageContext, {"role":"user","content": DESCRIBE_RESULTS});
     
     const resultParts = result.split('\n');
     // This is disgusting, but let's fucking go.

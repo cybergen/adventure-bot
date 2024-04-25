@@ -8,6 +8,8 @@ export class InvokeContext extends InputContext {
   public channelId: string;
   public description: string;
   public difficulty: string;
+  public successCriteria: string;
+  public duration: string;
 
   public get userId(): string {
     return this._cmd.user.id;
