@@ -58,6 +58,20 @@ export class DiscordService extends Emitter<DiscordEvents> {
               label: 'Difficulty',
               style: TextInputStyle.Short
             })),
+          new ActionRowBuilder<TextInputBuilder>()
+            .addComponents(new TextInputBuilder({
+              type: ComponentType.TextInput,
+              customId: 'successCriteria',
+              label: 'Success Criteria',
+              style: TextInputStyle.Short
+            })),
+          new ActionRowBuilder<TextInputBuilder>()
+            .addComponents(new TextInputBuilder({
+              type: ComponentType.TextInput,
+              customId: 'duration',
+              label: 'Duration (minutes)',
+              style: TextInputStyle.Short
+            }))
         ]
       });
       
@@ -74,6 +88,8 @@ export class DiscordService extends Emitter<DiscordEvents> {
       invokeContext.channelId = interaction.channelId;
       invokeContext.description = result.fields.getTextInputValue('desc');
       invokeContext.difficulty = result.fields.getTextInputValue('difficulty');
+      invokeContext.successCriteria = result.fields.getTextInputValue('successCriteria');
+      invokeContext.duration = result.fields.getTextInputValue('duration');
       
       this.emit('adventureInvoke',  invokeContext);
     }

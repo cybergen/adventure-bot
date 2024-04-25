@@ -14,7 +14,7 @@ import { userMention } from 'discord.js';
 enum AdventureState {
   Idle = 'idle',
   Collecting = 'collecting', // Awaiting reactions to begin the adventure
-  InputStage = 'input-stage', // Awaiting players to provide their input
+  StageInput = 'stage-input', // Awaiting players to provide their input
   AwaitingOutcome = 'awaiting-outcome',
   
   PostStage = 'post-stage',
@@ -35,6 +35,7 @@ export class Adventure extends Emitter<AdventureEvents> {
   private _courseDescription: {
     players: string[],
     difficulty: string,
+    successCriteria: string,
     stages: number,
     name: string
   };
@@ -58,7 +59,9 @@ export class Adventure extends Emitter<AdventureEvents> {
         header: 'Adventure Awaits!',
         meta: [
           { name: 'Prompt', value: config.description, short: false },
-          { name: 'Difficulty', value: config.difficulty, short: true }
+          { name: 'Difficulty', value: config.difficulty, short: true },
+          { name: 'Success Criteria', value: config.successCriteria, short: true },
+          { name: 'Duration', value: config.duration, short: true },
         ],
         body: `*We've got a new adventure starting! React to this message to join the adventure.*`
       }]
@@ -84,7 +87,7 @@ export class Adventure extends Emitter<AdventureEvents> {
     this._history = `Course History:\n[]\n\nPlayer History:\n${JSON.stringify(playerHistory)}`;
 
     const playerArray = Object.values(this._players);
-    const prompt = `${config.description} with a ${config.difficulty} difficulty`;
+    const prompt = `${config.description} with ${config.difficulty} difficulty, ${config.successCriteria} for success criteria, and duration of ${config.duration} minutes`;
     const courseDescRaw = await Services.OpenAI.getCourseDescription(prompt, playerArray);
     this._courseDescription = JSON5.parse(courseDescRaw);
     console.log(this._courseDescription);
@@ -229,7 +232,7 @@ export class Adventure extends Emitter<AdventureEvents> {
 
   private async startStage() {
     console.log(`\n\n==========Starting stage ${this._currentStage}`);
-    this._state = AdventureState.InputStage;
+    this._state = AdventureState.StageInput;
     
     //First clear the overall stage chat sequence
     this._currentStageContext = [];

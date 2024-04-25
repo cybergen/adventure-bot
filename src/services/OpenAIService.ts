@@ -60,7 +60,7 @@ export class OpenAIService {
         model: model,
         max_tokens: tokens
       });
-      console.log(`\n\n=================SINGLE SHOT RESPONSE: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
+      console.log(`\n\n=================SINGLE SHOT RESPONSE\n\n${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
       return completion.choices[0].message.content;
     } catch (error) {
       console.error("Error querying OpenAI:", error);
@@ -76,7 +76,7 @@ export class OpenAIService {
         model: model,
         max_tokens: tokens
       });
-      console.log(`\n\n=================CHAT RESPONSE: ${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
+      console.log(`\n\n=================CHAT RESPONSE\n\n${util.inspect(completion.choices[0], { showHidden: true, depth: null, showProxy: true })}\n\n`);
       return completion.choices[0].message.content;
     } catch (error) {
       console.error("Error querying OpenAI:", error);
@@ -92,12 +92,13 @@ Prompt strings
 */
 
 const courseDescriptionSystemPrompt = `
-You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, a difficulty, and a theme prompt. Your outputted data structure should look like so:
+You are a discord chat bot that produces a data structure describing a text-based obstacle course, challenge gauntlet, or other fun experience consisting of multiple stages for a set of players. Your input will be a list of player id's, a duration, a difficulty, a success criteria that players will be judged against, and a theme prompt. Your outputted data structure should look like so:
 
 {
   name: "The Wizard's Challenge",
   theme: "Magical quest through enchanted realms to unlock a wizard's ultimate power",
   difficulty: "Savage",
+  successCriteria: "Cleverness",
   stages: 5,
   players: ["vimes", "ghost_tree"]
 }
@@ -106,11 +107,21 @@ You are a discord chat bot that produces a data structure describing a text-base
   name: "Battle of the Brains",
   theme: "A light-hearded computer science romp",
   difficulty: "Easy",
+  successCriteria: "Factual correctness",
   stages: 10,
   players: ["telomerase", "Candelabra2"]
 }
 
-Assume that each stage takes around 2 minutes, and set a stage count based on that. Be sure to come up with a witty name!
+{
+  name: "Under the Mountains of Madness",
+  theme: "Grim fantasy dungeon delve to save a sick elf",
+  difficulty: "Medium",
+  successCriteria: "Descriptiveness and roleplay",
+  stages: 3,
+  players: ["Antler220", "ghost_tree"]
+}
+
+Assume that each stage takes 3 minutes, and set a stage count based on that. Be sure to come up with a witty name!
 `;
 
 //Stage Prompts
@@ -125,6 +136,7 @@ Course Description:
   name: "Under the Mountains of Madness",
   theme: "Grim fantasy dungeon delve to save a sick elf",
   difficulty: "Medium",
+  successCriteria: "Descriptiveness and roleplay",
   stages: 10,
   players: ["Antler220", "ghost_tree"]
 }
@@ -155,9 +167,9 @@ Note that the course and player histories may be empty at first if it is the fir
 After getting the initial plan and history input, you will describe only the current challenge stage directly in front of the players in 6 sentences or less.
 `;
 
-const historyUpdatePredicate = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc). Be 100% certain to indicate if they've been injured, died, etc. Post your update in the following format:\n\n";
+export const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty. Use the success criteria as a metric by which to judge their actions. Also, be 100% sure to honor the players' prior state and reject nonviable actions where applicable.";
 
-export const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty. Also, be 100% sure to honor the players' prior state and reject nonviable actions where applicable.";
+const historyUpdatePredicate = "Now return an updated version of course history and player history, taking particular care to indicate whether or not the player received an item or incurred some change of state (mental, physical, etc). Be 100% certain to indicate if they've been injured, died, etc. Post your update in the following format:\n\n";
 
 //Adventure Results Prompt
 
