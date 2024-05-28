@@ -1,4 +1,5 @@
 ﻿import { Services } from '../services/Services';
+import { describeResultsMessage } from '../services/OpenAIService';
 
 export class AdventureRuntime {
 
@@ -8,7 +9,6 @@ export class AdventureRuntime {
   //Initial plan for course
   private _courseDescription: {
     players: string[],
-    difficulty: string,
     stages: number,
     name: string
   };
@@ -32,7 +32,7 @@ export class AdventureRuntime {
   }
   
   public async setPrompt(prompt: string) {
-    const courseDescRaw = await Services.OpenAI.getLLMCourseDescription(prompt, this._players);
+    const courseDescRaw = await Services.OpenAI.getCourseDescription(prompt, this._players);
     this._courseDescription = JSON.parse(courseDescRaw);
     console.log(this._courseDescription);
     this._courseDescription.players = this._players;
@@ -41,7 +41,7 @@ export class AdventureRuntime {
   }
   
   public async startStage(): Promise<string> {
-    return await Services.OpenAI.getLLMStageDescription(this._currentStageContext, this._courseDescription, this._history);
+    return await Services.OpenAI.getStageDescription(this._currentStageContext, this._courseDescription, this._history);
   }
   
   public getPlayersNeedingInput(): string[] {
@@ -66,5 +66,3 @@ export class AdventureRuntime {
     return outcome;
   }
 }
-
-const describeResultsMessage = "Time's up! The players either supplied their actions or failed to respond. Please describe what happens to them in 2 sentences each and BE APPROPRIATELY HARSH to the course difficulty.";
