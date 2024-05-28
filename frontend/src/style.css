@@ -1,0 +1,17 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: black !important;
+  height: 100%;
+}
+
+span {
+  color: bisque;
+}
